@@ -1,27 +1,35 @@
-# Image « web » : sert le site statique avec nginx.
-# Image « updater » : met à jour historique.json à intervalle régulier.
-# historique.json est placé dans /data pour être partagé entre les deux
-# via un volume (voir docker-compose.yml).
-
-FROM nginx:1.27-alpine AS web
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY *.html *.css *.js *.json *.svg /usr/share/nginx/html/
-# Propriétaire 1000 (utilisateur « node » de l'image updater) : le volume
-# partagé reste modifiable quel que soit le service qui l'initialise
-RUN mkdir /data && chown 1000:1000 /data
-COPY --chown=1000:1000 historique.json /data/historique.json
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO /dev/null http://127.0.0.1/ || exit 1
-
-FROM node:24-alpine AS updater
+# Étape 1 : construit l'interface (design system SGDF, @sgdf/ui) dans public/ui
+FROM node:24-alpine AS interface
 WORKDIR /app
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
+COPY client/ client/
 COPY scripts/ scripts/
-COPY camps.json ./
-# Le script écrit ../historique.json : on le redirige vers le volume partagé
-RUN mkdir /data && chown node:node /data && ln -s /data/historique.json /app/historique.json
-COPY --chown=node:node historique.json /data/historique.json
-COPY docker/updater.sh /usr/local/bin/updater.sh
-ENV UPDATE_INTERVAL_MINUTES=15 \
-    TZ=Europe/Paris
+COPY public/ public/
+RUN npm run build
+
+# Étape 2 : image finale, un seul conteneur Node : site, admin, relevé des prévisions et mails.
+# Les données (base SQLite + historique.json) sont dans le volume /data.
+FROM node:24-alpine
+
+ENV NODE_ENV=production \
+    TZ=Europe/Paris \
+    PORT=3000 \
+    DATA_DIR=/data
+
+WORKDIR /app
+RUN apk add --no-cache tzdata
+
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+COPY server/ server/
+COPY --from=interface /app/public/ public/
+COPY seed/ seed/
+RUN mkdir -p /data && chown node:node /data
+
 USER node
-CMD ["sh", "/usr/local/bin/updater.sh"]
+VOLUME /data
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+    CMD wget -qO /dev/null "http://127.0.0.1:${PORT}/healthz" || exit 1
+CMD ["node", "server/index.mjs"]

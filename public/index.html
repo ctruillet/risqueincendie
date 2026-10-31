@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prévisions des massifs – Nature Environnement</title>
+    <meta name="description" content="Accès aux massifs forestiers (risque incendie) aujourd'hui et demain pour les camps Nature Environnement : Bouches-du-Rhône, Var, Hérault, Gard et autres départements.">
+    <link rel="stylesheet" href="ui/sgdf.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#003a5d">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <script>
+    // Mode hors ligne : enregistré après le chargement, pour ne pas ralentir le premier affichage
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => setTimeout(() => navigator.serviceWorker.register('./sw.js'), 2000));
+    }
+    </script>
+</head>
+<body>
+
+    <header class="barre">
+        <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+    </header>
+
+    <main class="container">
+        <div class="titre-page">
+            <p class="surtitre">Camps Nature Environnement</p>
+            <h1>Prévisions des massifs</h1>
+            <p class="chapeau">Accès aux massifs forestiers aujourd'hui et demain, selon les préfectures.</p>
+        </div>
+        <p id="status-line" class="status-line" role="status"></p>
+        <div id="dashboard-container" class="camps">
+            <p class="loading">Chargement des camps…</p>
+        </div>
+    </main>
+
+    <footer class="pied">
+        <div class="pied-corps">
+            <div class="pied-haut">
+                <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+                <div class="footer-texte">
+                    <p id="footer-depts">Données issues des préfectures.</p>
+                    <p><a href="https://www.risque-prevention-incendie.fr" target="_blank" rel="noopener noreferrer">Voir la carte officielle</a></p>
+                </div>
+            </div>
+            <p class="pied-legal">Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France</p>
+        </div>
+    </footer>
+
+    <script src="js/common.js" defer></script>
+    <script src="js/app.js" defer></script>
+</body>
+</html>

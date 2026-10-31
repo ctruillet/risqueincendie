@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Logo : trois pins au-dessus d'une vague (forêt et mer, camps Nature Environnement) -->
+  <rect width="512" height="512" rx="112" fill="#0a7a58"/>
+  <g fill="#ffffff">
+    <path d="M256 92 L332 218 H300 L352 304 H160 L212 218 H180 Z"/>
+    <rect x="242" y="300" width="28" height="44" rx="4"/>
+    <path d="M150 172 L204 262 H182 L220 326 H80 L118 262 H96 Z" opacity="0.72"/>
+    <path d="M362 172 L416 262 H394 L432 326 H292 L330 262 H308 Z" opacity="0.72"/>
+  </g>
+  <path d="M96 392 C136 368 176 368 216 392 S296 416 336 392 S416 368 416 392" fill="none" stroke="#7fe0c6" stroke-width="22" stroke-linecap="round"/>
+</svg>

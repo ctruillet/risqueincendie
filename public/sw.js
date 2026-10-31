@@ -1,17 +1,21 @@
-const CACHE_NAME = 'ne-massifs-v5';
+const CACHE_NAME = 'ne-massifs-v13';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
-  './common.js',
+  './css/style.css',
+  './ui/sgdf.css',
+  './js/app.js',
+  './js/common.js',
   './camp.html',
-  './camp.js',
+  './js/camp.js',
   './camps.json',
   './regles.json',
   './historique.json',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './logo.svg',
+  './icon-192.png',
+  './apple-touch-icon.png'
 ];
 
 // Installation : mise en cache des fichiers de l'application
@@ -35,9 +39,12 @@ self.addEventListener('activate', (e) => {
 // Réseau d'abord : on garde une copie à jour en cache, utilisée hors ligne
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // L'admin et son API ne passent jamais par le cache
+  const { pathname } = new URL(e.request.url);
+  if (pathname.startsWith('/api/') || /^\/(admin(\.html)?|js\/admin\.js|css\/admin\.css)$/.test(pathname)) return;
 
   e.respondWith(
-    // no-cache : contourne le cache HTTP du navigateur (10 min sur GitHub Pages)
+    // no-cache : contourne le cache HTTP du navigateur
     // pour toujours récupérer la dernière version quand le réseau est là.
     // On repart de l'URL : une requête de navigation ne peut pas être copiée avec d'autres options.
     fetch(e.request.url, { cache: 'no-cache' })
@@ -48,6 +55,6 @@ self.addEventListener('fetch', (e) => {
         }
         return response;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
 });

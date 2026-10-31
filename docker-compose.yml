@@ -1,21 +1,21 @@
+# Site, admin, relevé des prévisions et envoi des mails dans un seul conteneur.
+# Réglages dans .env (voir .env.example). Les données sont dans le volume « data ».
+# Le site écoute sur 127.0.0.1:<PORT> : placer devant un reverse proxy HTTPS (voir docker/nginx-site.conf).
 services:
-  web:
-    build:
-      context: .
-      target: web
+  risquemassif:
+    build: .
+    image: risquemassif
+    env_file: .env
     ports:
-      - "${PORT:-8080}:80"
-    volumes:
-      - data:/data:ro
-    restart: unless-stopped
-
-  updater:
-    build:
-      context: .
-      target: updater
+      - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"
     volumes:
       - data:/data
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   data:

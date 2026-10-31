@@ -1,0 +1,8 @@
+node_modules/
+data/
+backups/
+.env
+.env.*
+!.env.example
+# Construit par « npm run build » (design system SGDF)
+public/ui/

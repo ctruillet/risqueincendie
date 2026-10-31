@@ -1,0 +1,22 @@
+{
+  "name": "ne-massifs",
+  "private": true,
+  "type": "module",
+  "description": "Prévisions d'accès aux massifs pour les camps SGDF, avec admin et notifications par mail",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build-ui.mjs",
+    "start": "node server/index.mjs",
+    "dev": "npm run build && COOKIE_SECURE=0 node --watch server/index.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "10.1.7"
+  },
+  "devDependencies": {
+    "@awesome.me/webawesome": "3.14.0",
+    "@sgdf/ui": "1.4.0",
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,4 +1,3 @@
-const API_URL = 'https://www.risque-prevention-incendie.fr/static';
 const JOURS_HISTORIQUE = 7;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -10,18 +9,24 @@ function getQueryDate() {
 
 async function fetchLiveData(dept, dateStr) {
     try {
-        return await fetchJson(`${API_URL}/${dept}/import_data/${dateStr}.json`);
+        return await fetchJson(`previsions/${dept}/${dateStr}.json`);
     } catch {
         return null;
     }
 }
 
-// La valeur d'un massif peut être un tableau [niveau, ...] ou directement le niveau
-function extractStatus(data, idMassif) {
+// Statut d'un massif = clé de regles.json (même logique que server/history.mjs) :
+// le niveau, sauf cas particuliers « idMassif:niveau », « niveauPprocédure », « *pProcédure »
+function extractStatus(data, idMassif, reglesDept = {}) {
     const value = data?.massifs?.[idMassif];
-    const status = Array.isArray(value) ? value[0] : value;
-    return status == null ? undefined : String(status);
+    if (value == null) return undefined;
+    const [niveau, procedure = 0] = Array.isArray(value) ? value : [value];
+    const cles = [`${idMassif}:${niveau}`, `${niveau}p${procedure}`, `*p${procedure}`];
+    return cles.find(cle => cle in reglesDept) ?? String(niveau);
 }
+
+// Icône calendrier (Font Awesome, livrée avec le design system SGDF)
+const ICONE_CALENDRIER = '<svg viewBox="0 0 640 640" aria-hidden="true"><path fill="currentColor" d="M224 64C241.7 64 256 78.3 256 96L256 128L384 128L384 96C384 78.3 398.3 64 416 64C433.7 64 448 78.3 448 96L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 96C192 78.3 206.3 64 224 64zM160 304L160 336C160 344.8 167.2 352 176 352L208 352C216.8 352 224 344.8 224 336L224 304C224 295.2 216.8 288 208 288L176 288C167.2 288 160 295.2 160 304zM288 304L288 336C288 344.8 295.2 352 304 352L336 352C344.8 352 352 344.8 352 336L352 304C352 295.2 344.8 288 336 288L304 288C295.2 288 288 295.2 288 304zM432 288C423.2 288 416 295.2 416 304L416 336C416 344.8 423.2 352 432 352L464 352C472.8 352 480 344.8 480 336L480 304C480 295.2 472.8 288 464 288L432 288zM160 432L160 464C160 472.8 167.2 480 176 480L208 480C216.8 480 224 472.8 224 464L224 432C224 423.2 216.8 416 208 416L176 416C167.2 416 160 423.2 160 432zM304 416C295.2 416 288 423.2 288 432L288 464C288 472.8 295.2 480 304 480L336 480C344.8 480 352 472.8 352 464L352 432C352 423.2 344.8 416 336 416L304 416zM416 432L416 464C416 472.8 423.2 480 432 480L464 480C472.8 480 480 472.8 480 464L480 432C480 423.2 472.8 416 464 416L432 416C423.2 416 416 423.2 416 432z"/></svg>';
 
 function genererStructureCamp(camp, labels) {
     const rowsHtml = camp.zones.map(zone => {
@@ -30,28 +35,30 @@ function genererStructureCamp(camp, labels) {
         <article id="row-${cle}" class="zone-row card-status-unknown">
             <div class="row-header">
                 <div class="day-info">
-                    <span class="day-label">${labels.jour}</span>
                     <span class="zone-tag">${escapeHtml(zone.label)}</span>
+                    <span class="tomorrow-line">
+                        <span class="tomorrow-label">${labels.lendemain} :</span>
+                        <span id="${cle}-tomorrow" class="badge-tomorrow-sub text-status-unknown">…</span>
+                    </span>
                 </div>
-                <span id="${cle}-today" class="badge-today-main">...</span>
+                <div class="today">
+                    <span class="day-label">${labels.jour}</span>
+                    <span id="${cle}-today" class="badge-today-main">…</span>
+                </div>
             </div>
-            <div class="tomorrow-line">
-                <span class="tomorrow-label">${labels.lendemain}</span>
-                <span id="${cle}-tomorrow" class="badge-tomorrow-sub text-status-unknown">...</span>
-            </div>
-            <button type="button" class="detail-toggle" aria-expanded="false" aria-controls="${cle}-detail">
-                Détails et 7 derniers jours
-            </button>
-            <div id="${cle}-detail" class="zone-detail" hidden></div>
+            <details class="zone-details">
+                <summary>Détails et 7 derniers jours</summary>
+                <div id="${cle}-detail" class="zone-detail"></div>
+            </details>
         </article>`;
     }).join('');
 
     const lienEte = `camp.html?camp=${encodeURIComponent(camp.id)}`;
     return `
-        <section class="main-card">
-            <h2 class="card-title"><a href="${lienEte}">${escapeHtml(camp.titre)}</a></h2>
+        <section class="carte camp">
+            <h2 class="carte-titre"><a href="${lienEte}">${escapeHtml(camp.titre)}</a></h2>
             <div class="rows-container">${rowsHtml}</div>
-            <a class="season-link" href="${lienEte}">📅 Historique de l'été</a>
+            <a class="lien-action" href="${lienEte}">${ICONE_CALENDRIER}Historique de l'été</a>
         </section>`;
 }
 
@@ -107,17 +114,6 @@ function genererDetail({ zone, labels, statusToday, statusTomorrow, sources, reg
         <ul class="trend">${points}</ul>`;
 }
 
-function brancherDetails(container) {
-    container.addEventListener('click', (e) => {
-        const bouton = e.target.closest('.detail-toggle');
-        if (!bouton) return;
-        const panneau = document.getElementById(bouton.getAttribute('aria-controls'));
-        const ouvert = bouton.getAttribute('aria-expanded') === 'true';
-        bouton.setAttribute('aria-expanded', String(!ouvert));
-        panneau.hidden = ouvert;
-    });
-}
-
 function afficherDepartements(zones) {
     const depts = [...new Set(zones.map(z => z.dept))].sort();
     const liste = depts.length > 1
@@ -152,11 +148,18 @@ async function init() {
         return;
     }
 
+    // Les camps terminés ne sont plus affichés (leur page « été » reste accessible)
+    // (le serveur ne publie pas les dates des camps, seulement s'ils sont terminés)
+    if (estAujourdhui) camps = camps.filter(c => !c.termine);
+    if (camps.length === 0) {
+        container.innerHTML = '<p class="loading">Aucun camp en cours ou à venir.</p>';
+        statusLine.textContent = '';
+        return;
+    }
     const zones = camps.flatMap(c => c.zones);
     const historyByDate = new Map(history.map(item => [item.date, item]));
     afficherDepartements(zones);
     container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels)).join('');
-    brancherDetails(container);
 
     // Statuts courants par clé de zone, initialisés depuis l'historique
     const statuts = {
@@ -204,7 +207,7 @@ async function init() {
     let nbLive = 0;
     for (const zone of zones) {
         for (const [jour, live] of [['today', liveToday], ['tomorrow', liveTomorrow]]) {
-            const status = extractStatus(live[zone.dept], zone.id_massif);
+            const status = extractStatus(live[zone.dept], zone.id_massif, regles[zone.dept]);
             if (status !== undefined) {
                 statuts[jour][zone.cle] = status;
                 sources[jour][zone.cle] = '(site officiel, en direct)';
@@ -217,7 +220,7 @@ async function init() {
     const heure = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }).format(new Date());
     statusLine.textContent = nbLive > 0
         ? `Mis à jour à ${heure} depuis le site officiel`
-        : `Site officiel injoignable : données enregistrées (vérifié à ${heure})`;
+        : `Rien de publié en direct pour l'instant : données enregistrées (vérifié à ${heure})`;
 }
 
 init();

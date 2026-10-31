@@ -1,5 +1,13 @@
 // Fonctions partagées entre la page d'accueil (app.js) et la page camp (camp.js)
 
+// Créer un formateur de dates est coûteux : chacun est créé une fois puis réutilisé
+const formateurs = new Map();
+function formateur(locale, options) {
+    const cle = locale + JSON.stringify(options);
+    if (!formateurs.has(cle)) formateurs.set(cle, new Intl.DateTimeFormat(locale, options));
+    return formateurs.get(cle);
+}
+
 // Date (+ offset en jours) au format AAAA-MM-JJ, à l'heure de Paris.
 // Sans date de base, part d'aujourd'hui.
 function getIsoDate(offset = 0, base = null) {
@@ -11,12 +19,11 @@ function getIsoDate(offset = 0, base = null) {
     }
     const d = new Date();
     d.setDate(d.getDate() + offset);
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(d);
+    return formateur('en-CA', { timeZone: 'Europe/Paris' }).format(d);
 }
 
 function formatDate(isoDate, options = { weekday: 'short', day: 'numeric', month: 'short' }) {
-    return new Intl.DateTimeFormat('fr-FR', { ...options, timeZone: 'UTC' })
-        .format(new Date(`${isoDate}T12:00:00Z`));
+    return formateur('fr-FR', { ...options, timeZone: 'UTC' }).format(new Date(`${isoDate}T12:00:00Z`));
 }
 
 function escapeHtml(value) {

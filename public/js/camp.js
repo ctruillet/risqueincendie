@@ -17,7 +17,7 @@ function datesSaison(annee) {
 // Catégorie d'affichage d'un jour : couleur + libellé de la règle, ou cas particuliers
 function categorie(date, status, reglesDept, today) {
     const config = reglesDept?.[status];
-    if (config) return { cle: `${config.color}|${config.label}`, color: config.color, label: config.label, detail: config.detail };
+    if (config) return { cle: `${config.color}|${config.label}`, color: config.color, label: config.label, detail: config.detail, acces: config.acces !== false };
     if (date > today) return { cle: 'future', color: 'future', label: 'À venir', detail: '' };
     return { cle: 'unknown', color: 'unknown', label: 'Sans donnée', detail: '' };
 }
@@ -55,8 +55,10 @@ function genererResume(jours) {
         <li><span class="legend-dot cell-${g.color}"></span>${escapeHtml(g.label)} <strong>${g.nb} j</strong></li>`
     ).join('');
 
+    // Certains départements ne publient qu'un niveau de risque : pas de décompte autorisé / interdit
+    const accesConnu = jours.every(j => j.cat.acces !== false);
     return `
-        <div class="stats">${tuiles}</div>
+        ${accesConnu ? `<div class="stats">${tuiles}</div>` : ''}
         <div class="season-bar" aria-hidden="true">${barre}</div>
         <ul class="legend">${legende}</ul>
         <p class="hint">${pluriel(connus, 'jour')} renseigné${connus > 1 ? 's' : ''} sur ${jours.length}. Touchez un jour pour voir la règle appliquée.</p>`;
@@ -93,29 +95,26 @@ function genererMois(jours, today) {
 
 function genererZone(zone, jours, today, avecTitre) {
     return `
-        <section class="main-card zone-panel" id="zone-${escapeHtml(zone.cle)}" data-zone="${escapeHtml(zone.cle)}"
-                 ${avecTitre ? '' : 'role="tabpanel"'}>
-            ${avecTitre ? `<h2 class="card-title">${escapeHtml(zone.label)}</h2>` : ''}
+        <section class="carte zone-panel" data-zone="${escapeHtml(zone.cle)}">
+            <h2 class="${avecTitre ? 'carte-titre' : 'visually-hidden'}">${escapeHtml(zone.label)}</h2>
             ${genererResume(jours)}
             <div class="months">${genererMois(jours, today)}</div>
             <p class="day-info-box" aria-live="polite" hidden></p>
         </section>`;
 }
 
-// Onglets quand le camp a plusieurs zones (ex. Sainte-Baume : 13 et 83)
-function genererOnglets(zones, active) {
-    if (zones.length < 2) return '';
+// Un onglet par zone quand le camp en a plusieurs (ex. Sainte-Baume : 13 et 83)
+function genererZones(zones, joursParZone, today, active) {
+    if (zones.length < 2) return genererZone(zones[0], joursParZone.get(zones[0].cle), today, true);
     return `
-        <div class="zone-tabs" role="tablist" aria-label="Zone">
-            ${zones.map(z => `
-                <button type="button" role="tab" class="zone-tab" data-zone="${escapeHtml(z.cle)}"
-                        aria-controls="zone-${escapeHtml(z.cle)}" aria-selected="${z.cle === active}">${escapeHtml(z.label)}</button>`).join('')}
-        </div>`;
-}
-
-function activerZone(container, cle) {
-    container.querySelectorAll('.zone-tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.zone === cle)));
-    container.querySelectorAll('.zone-panel').forEach(p => { p.hidden = p.dataset.zone !== cle; });
+        <div class="onglets" role="tablist" aria-label="Zone">
+            ${zones.map(z => `<button type="button" role="tab" class="onglet" id="onglet-${escapeHtml(z.cle)}"
+                data-zone="${escapeHtml(z.cle)}" aria-controls="panneau-${escapeHtml(z.cle)}"
+                aria-selected="${z.cle === active}" tabindex="${z.cle === active ? 0 : -1}">${escapeHtml(z.label)}</button>`).join('')}
+        </div>
+        ${zones.map(z => `<div role="tabpanel" class="panneau" id="panneau-${escapeHtml(z.cle)}"
+            aria-labelledby="onglet-${escapeHtml(z.cle)}" ${z.cle === active ? '' : 'hidden'}>
+            ${genererZone(z, joursParZone.get(z.cle), today, false)}</div>`).join('')}`;
 }
 
 async function init() {
@@ -150,12 +149,14 @@ async function init() {
 
     const nomCamp = camp.titre.replace(/^\W+/u, '').trim();
     document.title = `${nomCamp} – Été ${annee}`;
-    document.getElementById('camp-title').textContent = nomCamp;
+    document.getElementById('camp-nom').textContent = nomCamp;
 
     const select = document.getElementById('year-select');
-    select.innerHTML = annees.map(a => `<option value="${a}"${a === annee ? ' selected' : ''}>Été ${a}</option>`).join('');
+    select.innerHTML = annees.map(a => `<option value="${a}">Été ${a}</option>`).join('');
+    select.value = annee;
     select.disabled = annees.length < 2;
     select.addEventListener('change', () => {
+        if (select.value === annee) return;
         params.set('annee', select.value);
         window.location.search = params.toString();
     });
@@ -166,21 +167,33 @@ async function init() {
         cat: categorie(date, historyByDate.get(date)?.[zone.cle], regles[zone.dept], today)
     }))]));
 
-    const plusieurs = camp.zones.length > 1;
     const zoneActive = camp.zones.some(z => z.cle === params.get('zone')) ? params.get('zone') : camp.zones[0].cle;
-    container.innerHTML = genererOnglets(camp.zones, zoneActive)
-        + camp.zones.map(zone => genererZone(zone, joursParZone.get(zone.cle), today, !plusieurs)).join('');
-    if (plusieurs) activerZone(container, zoneActive);
+    container.innerHTML = genererZones(camp.zones, joursParZone, today, zoneActive);
+
+    // Onglets : clic, flèches gauche/droite ; l'onglet affiché est mémorisé dans l'adresse
+    const activerOnglet = (onglet) => {
+        container.querySelectorAll('.onglet').forEach(o => {
+            const actif = o === onglet;
+            o.setAttribute('aria-selected', String(actif));
+            o.tabIndex = actif ? 0 : -1;
+            document.getElementById(o.getAttribute('aria-controls')).hidden = !actif;
+        });
+        params.set('zone', onglet.dataset.zone);
+        window.history.replaceState(null, '', `?${params}`);
+    };
+    container.addEventListener('keydown', (e) => {
+        const onglet = e.target.closest('.onglet');
+        if (!onglet || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+        const tous = [...container.querySelectorAll('.onglet')];
+        const suivant = tous[(tous.indexOf(onglet) + (e.key === 'ArrowRight' ? 1 : tous.length - 1)) % tous.length];
+        activerOnglet(suivant);
+        suivant.focus();
+    });
 
     container.addEventListener('click', (e) => {
-        // Changement d'onglet (mémorisé dans l'adresse pour le partage)
-        const onglet = e.target.closest('.zone-tab');
-        if (onglet) {
-            activerZone(container, onglet.dataset.zone);
-            params.set('zone', onglet.dataset.zone);
-            window.history.replaceState(null, '', `?${params}`);
-            return;
-        }
+        const onglet = e.target.closest('.onglet');
+        if (onglet) return activerOnglet(onglet);
+
 
         // Toucher un jour affiche sa règle en bas de l'écran
         const cell = e.target.closest('.cell');

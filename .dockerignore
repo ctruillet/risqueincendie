@@ -1,6 +1,13 @@
 .git
-.github
-README.md
-docker-compose.yml
-Dockerfile
+.gitignore
 .dockerignore
+.env
+.env.*
+README.md
+Dockerfile
+docker-compose*.yml
+docker
+node_modules
+data
+backups
+public/ui

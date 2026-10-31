@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta name="description" content="Administration des camps Nature Environnement : dates, massifs et contacts prévenus par mail.">
+    <title>Administration – Nature Environnement</title>
+    <link rel="stylesheet" href="ui/sgdf.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <meta name="theme-color" content="#003a5d">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+
+    <header class="barre">
+            <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+            <span id="session" class="session" hidden>
+                <span id="user-email" class="session-email"></span>
+                <sgdf-icon-button id="btn-logout" name="right-from-bracket" library="solid" label="Déconnexion"></sgdf-icon-button>
+            </span>
+    </header>
+
+    <main class="container">
+        <div class="titre-page">
+            <p class="surtitre">Administration</p>
+            <h1>Camps Nature Environnement</h1>
+            <p class="chapeau">Camps, dates, massifs et contacts prévenus par mail la veille de chaque jour de camp.</p>
+        </div>
+
+        <!-- Connexion -->
+        <section id="vue-login" class="carte carte-etroite" hidden>
+            <h2>Connexion</h2>
+            <form id="form-login" class="form">
+                <label class="champ">Email
+                    <input name="email" type="email" autocomplete="username" required>
+                </label>
+                <label class="champ">Mot de passe
+                    <input name="password" type="password" autocomplete="current-password" required>
+                </label>
+                <p class="form-error alerte" role="alert" hidden></p>
+                <button type="submit" class="bouton">Se connecter</button>
+            </form>
+        </section>
+
+        <!-- Application -->
+        <sgdf-tab-group id="vue-app" active="camps" hidden>
+            <sgdf-tab panel="camps">Camps</sgdf-tab>
+            <sgdf-tab panel="envois">Mails envoyés</sgdf-tab>
+            <sgdf-tab panel="comptes">Comptes</sgdf-tab>
+
+            <!-- Onglet Camps : liste ou formulaire -->
+            <sgdf-tab-panel name="camps">
+                <div id="vue-liste" class="pile">
+                    <sgdf-callout variant="info" title="Relevé des prévisions">
+                        <div id="status-texte" class="status-texte">…</div>
+                        <div class="actions">
+                            <sgdf-button id="btn-passage" size="small" appearance="outlined">
+                                <sgdf-icon slot="prefix" name="rotate" library="solid"></sgdf-icon>
+                                Vérifier les prévisions maintenant
+                            </sgdf-button>
+                            <sgdf-button id="btn-test-mail" size="small" appearance="outlined">
+                                <sgdf-icon slot="prefix" name="envelope" library="solid"></sgdf-icon>
+                                M'envoyer un mail de test
+                            </sgdf-button>
+                        </div>
+                    </sgdf-callout>
+
+                    <div id="liste-camps" class="pile"></div>
+
+                    <sgdf-button id="btn-nouveau" variant="primary">
+                        <sgdf-icon slot="prefix" name="plus" library="solid"></sgdf-icon>
+                        Nouveau camp
+                    </sgdf-button>
+                </div>
+
+                <sgdf-card id="vue-edition" hidden>
+                    <h2 slot="header" id="titre-edition">Nouveau camp</h2>
+                    <form id="form-camp" class="form">
+                        <sgdf-input name="titre" label="Nom du camp" maxlength="120" required
+                                    placeholder="Camp Pionniers (Sainte-Baume)"></sgdf-input>
+                        <div class="form-row">
+                            <sgdf-date-time-picker name="debut" label="Début"></sgdf-date-time-picker>
+                            <sgdf-date-time-picker name="fin" label="Fin"></sgdf-date-time-picker>
+                        </div>
+                        <p class="hint-form">Pendant ces dates, les contacts reçoivent chaque soir les prévisions du lendemain. Sans dates, le camp est seulement affiché sur le site.</p>
+
+                        <fieldset>
+                            <legend>Massifs</legend>
+                            <div id="zones" class="lignes"></div>
+                            <sgdf-button id="btn-ajout-zone" size="small" appearance="text">
+                                <sgdf-icon slot="prefix" name="plus" library="solid"></sgdf-icon>
+                                Ajouter un massif
+                            </sgdf-button>
+                        </fieldset>
+
+                        <fieldset>
+                            <legend>Contacts</legend>
+                            <div id="contacts" class="lignes"></div>
+                            <sgdf-button id="btn-ajout-contact" size="small" appearance="text">
+                                <sgdf-icon slot="prefix" name="plus" library="solid"></sgdf-icon>
+                                Ajouter un contact
+                            </sgdf-button>
+                            <p class="hint-form">Chaque contact reçoit les prévisions par mail pendant les dates du camp.</p>
+                        </fieldset>
+
+                        <sgdf-callout class="form-error" variant="danger" hidden></sgdf-callout>
+                        <div class="actions">
+                            <sgdf-button submit variant="primary">Enregistrer</sgdf-button>
+                            <sgdf-button id="btn-annuler" appearance="outlined">Annuler</sgdf-button>
+                        </div>
+                    </form>
+                </sgdf-card>
+            </sgdf-tab-panel>
+
+            <!-- Onglet Mails envoyés -->
+            <sgdf-tab-panel name="envois">
+                <sgdf-card>
+                    <h2 slot="header">50 derniers mails</h2>
+                    <div id="liste-envois"></div>
+                </sgdf-card>
+            </sgdf-tab-panel>
+
+            <!-- Onglet Comptes -->
+            <sgdf-tab-panel name="comptes">
+                <div class="pile">
+                    <sgdf-card>
+                        <h2 slot="header">Comptes admin</h2>
+                        <ul id="liste-users" class="liste-simple"></ul>
+                        <form id="form-user" class="form form-inline">
+                            <sgdf-input name="email" type="email" label="Email" required></sgdf-input>
+                            <sgdf-input name="nom" label="Nom" maxlength="80"></sgdf-input>
+                            <sgdf-button submit variant="primary">
+                                <sgdf-icon slot="prefix" name="user-plus" library="solid"></sgdf-icon>
+                                Ajouter
+                            </sgdf-button>
+                        </form>
+                        <sgdf-callout class="form-error" variant="danger" hidden></sgdf-callout>
+                    </sgdf-card>
+
+                    <sgdf-card>
+                        <h2 slot="header">Changer mon mot de passe</h2>
+                        <form id="form-password" class="form">
+                            <input type="email" name="email" autocomplete="username" hidden>
+                            <sgdf-input name="actuel" type="password" label="Mot de passe actuel" autocomplete="current-password" password-toggle required></sgdf-input>
+                            <sgdf-input name="nouveau" type="password" label="Nouveau mot de passe" hint="10 caractères minimum"
+                                        autocomplete="new-password" minlength="10" password-toggle required></sgdf-input>
+                            <sgdf-callout class="form-error" variant="danger" hidden></sgdf-callout>
+                            <sgdf-button submit variant="primary">Changer</sgdf-button>
+                        </form>
+                    </sgdf-card>
+                </div>
+            </sgdf-tab-panel>
+        </sgdf-tab-group>
+    </main>
+
+    <!-- Confirmation d'une action (suppression, envoi) -->
+    <sgdf-dialog id="confirmation" title="Confirmer">
+        <p id="confirmation-texte"></p>
+        <sgdf-button slot="footer" id="confirmation-annuler" appearance="outlined">Annuler</sgdf-button>
+        <sgdf-button slot="footer" id="confirmation-ok" variant="danger">Confirmer</sgdf-button>
+    </sgdf-dialog>
+
+    <!-- Mot de passe provisoire d'un nouveau compte (affiché une seule fois) -->
+    <sgdf-dialog id="mdp-cree" title="Compte créé">
+        <p id="mdp-cree-texte"></p>
+        <p class="mdp"><code id="mdp-cree-valeur"></code></p>
+        <p class="hint-form">Il n'est affiché qu'une fois : transmettez-le à la personne, qui le changera à sa première connexion.</p>
+        <sgdf-button slot="footer" id="mdp-cree-ok" variant="primary">J'ai noté le mot de passe</sgdf-button>
+    </sgdf-dialog>
+
+    <sgdf-toast id="toast"></sgdf-toast>
+
+    <footer class="pied">
+        <div class="pied-corps">
+            <div class="pied-haut">
+                <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+                <div class="footer-texte">
+                    <p><a href="./">Retour au site</a></p>
+                </div>
+            </div>
+            <p class="pied-legal">Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France</p>
+        </div>
+    </footer>
+
+    <template id="tpl-zone">
+        <div class="ligne-form zone-ligne">
+            <sgdf-select name="dept" label="Département" size="small"></sgdf-select>
+            <sgdf-select name="id_massif" label="Massif" size="small" with-search></sgdf-select>
+            <sgdf-input name="label" label="Nom affiché" maxlength="80" size="small" placeholder="Facultatif"></sgdf-input>
+            <sgdf-icon-button class="btn-suppr" name="trash-can" library="solid" label="Retirer ce massif"></sgdf-icon-button>
+        </div>
+    </template>
+
+    <template id="tpl-contact">
+        <div class="ligne-form contact-ligne">
+            <sgdf-input name="nom" label="Nom" maxlength="80" size="small"></sgdf-input>
+            <sgdf-input name="email" type="email" label="Email" maxlength="254" size="small"></sgdf-input>
+            <sgdf-icon-button class="btn-suppr" name="trash-can" library="solid" label="Retirer ce contact"></sgdf-icon-button>
+        </div>
+    </template>
+
+    <script src="js/common.js" defer></script>
+    <script src="js/admin.js" defer></script>
+</body>
+</html>

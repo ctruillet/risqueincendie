@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Été du camp – Nature Environnement</title>
+    <meta name="description" content="Historique de l'été d'un camp Nature Environnement : niveau d'accès aux massifs forestiers jour par jour, du 1er juin au 30 septembre.">
+    <link rel="stylesheet" href="ui/sgdf.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#003a5d">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+
+    <header class="barre">
+        <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+    </header>
+
+    <main class="container">
+        <div class="titre-page avec-actions">
+            <div>
+                <a href="./" class="retour">← Tous les camps</a>
+                <p class="surtitre">Historique de l'été</p>
+                <h1 id="camp-nom">Été du camp</h1>
+            </div>
+            <select id="year-select" class="champ-select choix-annee" aria-label="Été"></select>
+        </div>
+        <div id="camp-container">
+            <p class="loading">Chargement…</p>
+        </div>
+    </main>
+
+    <footer class="pied">
+        <div class="pied-corps">
+            <div class="pied-haut">
+                <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+                <div class="footer-texte">
+                    <p>Données issues des préfectures.</p>
+                    <p><a href="https://www.risque-prevention-incendie.fr" target="_blank" rel="noopener noreferrer">Voir la carte officielle</a></p>
+                </div>
+            </div>
+            <p class="pied-legal">Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France</p>
+        </div>
+    </footer>
+
+    <script src="js/common.js" defer></script>
+    <script src="js/camp.js" defer></script>
+</body>
+</html>

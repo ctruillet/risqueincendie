@@ -1,0 +1,643 @@
+{
+  "6": {
+    "nom": "Alpes-Maritimes (06)",
+    "massifs": [
+      {
+        "id": "67",
+        "nom": "Haut Esteron"
+      },
+      {
+        "id": "63",
+        "nom": "Haut Pays"
+      },
+      {
+        "id": "61",
+        "nom": "Littoral Est"
+      },
+      {
+        "id": "65",
+        "nom": "Littoral Ouest"
+      },
+      {
+        "id": "62",
+        "nom": "Moyen Pays Ouest (n°62)"
+      },
+      {
+        "id": "64",
+        "nom": "Moyen Pays Ouest (n°64)"
+      },
+      {
+        "id": "66",
+        "nom": "Tanneron"
+      }
+    ]
+  },
+  "7": {
+    "nom": "Ardèche (07)",
+    "massifs": [
+      {
+        "id": "75",
+        "nom": "Bas Vivarais"
+      },
+      {
+        "id": "72",
+        "nom": "Boutières"
+      },
+      {
+        "id": "74",
+        "nom": "Cévennes"
+      },
+      {
+        "id": "79",
+        "nom": "Coiron"
+      },
+      {
+        "id": "73",
+        "nom": "Haut Plateau Nord"
+      },
+      {
+        "id": "77",
+        "nom": "Haut plateau Sud"
+      },
+      {
+        "id": "71",
+        "nom": "Haut Vivarais"
+      },
+      {
+        "id": "78",
+        "nom": "Vallée du Rhône Nord"
+      },
+      {
+        "id": "76",
+        "nom": "Vallée du Rhône Sud"
+      }
+    ]
+  },
+  "11": {
+    "nom": "Aude (11)",
+    "massifs": [
+      {
+        "id": "1119",
+        "nom": "Basses Plaines"
+      },
+      {
+        "id": "1113",
+        "nom": "Cabardes"
+      },
+      {
+        "id": "115",
+        "nom": "Cavayere Droite"
+      },
+      {
+        "id": "1123",
+        "nom": "Cavayere Gauche"
+      },
+      {
+        "id": "1117",
+        "nom": "Chalabrais"
+      },
+      {
+        "id": "111",
+        "nom": "Clape"
+      },
+      {
+        "id": "1114",
+        "nom": "Contreforts Ouest Montagne Noire"
+      },
+      {
+        "id": "1110",
+        "nom": "Corbieres Centrales"
+      },
+      {
+        "id": "114",
+        "nom": "Corbieres Maritimes"
+      },
+      {
+        "id": "119",
+        "nom": "Corbieres Occidentales"
+      },
+      {
+        "id": "112",
+        "nom": "Fontfroide"
+      },
+      {
+        "id": "1122",
+        "nom": "Île de Sainte Lucie"
+      },
+      {
+        "id": "118",
+        "nom": "Lezignanais"
+      },
+      {
+        "id": "1115",
+        "nom": "Malepere"
+      },
+      {
+        "id": "116",
+        "nom": "Minervois"
+      },
+      {
+        "id": "1120",
+        "nom": "Montagne Noire"
+      },
+      {
+        "id": "1121",
+        "nom": "Pays de Sault"
+      },
+      {
+        "id": "1118",
+        "nom": "Piege Lauragais"
+      },
+      {
+        "id": "113",
+        "nom": "Pinedes Cremades"
+      },
+      {
+        "id": "117",
+        "nom": "Plaine du Minervois"
+      },
+      {
+        "id": "1116",
+        "nom": "Razes Haute Vallee"
+      },
+      {
+        "id": "1111",
+        "nom": "Vallee de l'Orbieu"
+      },
+      {
+        "id": "1112",
+        "nom": "Vallee du Lauquet"
+      }
+    ]
+  },
+  "13": {
+    "nom": "Bouches-du-Rhône (13)",
+    "massifs": [
+      {
+        "id": "131",
+        "nom": "Alpilles"
+      },
+      {
+        "id": "132",
+        "nom": "Arbois"
+      },
+      {
+        "id": "133",
+        "nom": "Calanques"
+      },
+      {
+        "id": "134",
+        "nom": "Cap Canaille"
+      },
+      {
+        "id": "135",
+        "nom": "Castillon"
+      },
+      {
+        "id": "136",
+        "nom": "Chaine des Cotes"
+      },
+      {
+        "id": "137",
+        "nom": "Chambremont"
+      },
+      {
+        "id": "138",
+        "nom": "Collines de Gardanne"
+      },
+      {
+        "id": "139",
+        "nom": "Concors"
+      },
+      {
+        "id": "1310",
+        "nom": "Cote Bleue"
+      },
+      {
+        "id": "1311",
+        "nom": "Etoile"
+      },
+      {
+        "id": "1312",
+        "nom": "Garlaban"
+      },
+      {
+        "id": "1313",
+        "nom": "Grand Caunet"
+      },
+      {
+        "id": "1314",
+        "nom": "Lançon"
+      },
+      {
+        "id": "1315",
+        "nom": "Les Roques"
+      },
+      {
+        "id": "1316",
+        "nom": "Montagnette"
+      },
+      {
+        "id": "1327",
+        "nom": "Montagnette Partie Incendiée"
+      },
+      {
+        "id": "1317",
+        "nom": "Montaiguet"
+      },
+      {
+        "id": "1318",
+        "nom": "Pont de Rhaud"
+      },
+      {
+        "id": "1319",
+        "nom": "Quatre Termes"
+      },
+      {
+        "id": "1320",
+        "nom": "Regagnas"
+      },
+      {
+        "id": "1321",
+        "nom": "Rougadou"
+      },
+      {
+        "id": "1322",
+        "nom": "Sainte-Baume"
+      },
+      {
+        "id": "1323",
+        "nom": "Sainte-Victoire"
+      },
+      {
+        "id": "1324",
+        "nom": "Sulauze"
+      },
+      {
+        "id": "1325",
+        "nom": "Trevaresse"
+      }
+    ]
+  },
+  "17": {
+    "nom": "Charente-Maritime (17)",
+    "massifs": [
+      {
+        "id": "171",
+        "nom": "Secteur 1 – Îles et littoral"
+      },
+      {
+        "id": "172",
+        "nom": "Secteur 2 – Saintonge et Aunis"
+      },
+      {
+        "id": "173",
+        "nom": "Secteur 3 – Forêt de la Lande et estuaire"
+      },
+      {
+        "id": "174",
+        "nom": "Secteur 4 – Double Saintongeaise"
+      }
+    ]
+  },
+  "26": {
+    "nom": "Drôme (26)",
+    "massifs": [
+      {
+        "id": "264",
+        "nom": "Haut Diois"
+      },
+      {
+        "id": "268",
+        "nom": "Hautes Baronnies"
+      },
+      {
+        "id": "261",
+        "nom": "Nord Vallée du Rhône"
+      },
+      {
+        "id": "267",
+        "nom": "Nyonsais"
+      },
+      {
+        "id": "266",
+        "nom": "Pays de Dieulefit / Haute Roanne Oule"
+      },
+      {
+        "id": "262",
+        "nom": "Royans Vercors"
+      },
+      {
+        "id": "265",
+        "nom": "Sud Vallée du Rhône"
+      },
+      {
+        "id": "269",
+        "nom": "Uchaux Barry"
+      },
+      {
+        "id": "263",
+        "nom": "Vallée de la Drôme"
+      },
+      {
+        "id": "2610",
+        "nom": "Ventoux Toulourenc"
+      }
+    ]
+  },
+  "30": {
+    "nom": "Gard (30)",
+    "massifs": [
+      {
+        "id": "301",
+        "nom": "Causse Aigoual"
+      },
+      {
+        "id": "307",
+        "nom": "Costieres Petite Camargue"
+      },
+      {
+        "id": "308",
+        "nom": "Gard Rhodanien"
+      },
+      {
+        "id": "304",
+        "nom": "Gardon Vidourle"
+      },
+      {
+        "id": "306",
+        "nom": "Garrigues"
+      },
+      {
+        "id": "303",
+        "nom": "Nord Cevennes"
+      },
+      {
+        "id": "302",
+        "nom": "Sud Cevennes"
+      },
+      {
+        "id": "305",
+        "nom": "Val de Ceze"
+      }
+    ]
+  },
+  "34": {
+    "nom": "Hérault (34)",
+    "massifs": [
+      {
+        "id": "345",
+        "nom": "Collines Centre"
+      },
+      {
+        "id": "342",
+        "nom": "Escandorgue et Larzac"
+      },
+      {
+        "id": "343",
+        "nom": "Gangeois"
+      },
+      {
+        "id": "348",
+        "nom": "Gardiole"
+      },
+      {
+        "id": "344",
+        "nom": "Garrigues et Pinedes Est Heraultais"
+      },
+      {
+        "id": "346",
+        "nom": "Minervois et St Chinianais"
+      },
+      {
+        "id": "347",
+        "nom": "Plaine Viticole Coeur Herault Plaines"
+      },
+      {
+        "id": "349",
+        "nom": "Plaine Viticole Est Heraultais"
+      },
+      {
+        "id": "341",
+        "nom": "Somail Espinouse et Monts d Orb"
+      }
+    ]
+  },
+  "42": {
+    "nom": "Loire (42)",
+    "massifs": [
+      {
+        "id": "423",
+        "nom": "Monts du Beaujolais"
+      },
+      {
+        "id": "425",
+        "nom": "Monts du Forez"
+      },
+      {
+        "id": "427",
+        "nom": "Monts du Jarez et Bassin Stephanois"
+      },
+      {
+        "id": "422",
+        "nom": "Monts du Lyonnais"
+      },
+      {
+        "id": "429",
+        "nom": "Monts du Pilat"
+      },
+      {
+        "id": "426",
+        "nom": "Plaine du Forez"
+      },
+      {
+        "id": "421",
+        "nom": "Plaine Roannaise"
+      },
+      {
+        "id": "424",
+        "nom": "Plateau de Neulise"
+      },
+      {
+        "id": "428",
+        "nom": "Vallée du Rhône"
+      }
+    ]
+  },
+  "66": {
+    "nom": "Pyrénées-Orientales (66)",
+    "massifs": [
+      {
+        "id": "668",
+        "nom": "Alberes"
+      },
+      {
+        "id": "665",
+        "nom": "Aspres"
+      },
+      {
+        "id": "661",
+        "nom": "Capcir"
+      },
+      {
+        "id": "662",
+        "nom": "Cerdagne"
+      },
+      {
+        "id": "663",
+        "nom": "Conflent"
+      },
+      {
+        "id": "669",
+        "nom": "Corbieres"
+      },
+      {
+        "id": "664",
+        "nom": "Fenouilledes"
+      },
+      {
+        "id": "667",
+        "nom": "Roussillon"
+      },
+      {
+        "id": "666",
+        "nom": "Vallespir"
+      }
+    ]
+  },
+  "81": {
+    "nom": "Tarn (81)",
+    "massifs": [
+      {
+        "id": "811",
+        "nom": "Grésigne et Causses"
+      },
+      {
+        "id": "815",
+        "nom": "Montagne Noire"
+      },
+      {
+        "id": "813",
+        "nom": "Monts de Lacaune"
+      },
+      {
+        "id": "816",
+        "nom": "Plaines"
+      },
+      {
+        "id": "812",
+        "nom": "Ségala et Monts d'Alban"
+      },
+      {
+        "id": "814",
+        "nom": "Sidobre Vallée du Thoré"
+      }
+    ]
+  },
+  "83": {
+    "nom": "Var (83)",
+    "massifs": [
+      {
+        "id": "836",
+        "nom": "Centre Var"
+      },
+      {
+        "id": "834",
+        "nom": "Corniche des Maures"
+      },
+      {
+        "id": "838",
+        "nom": "Esterel"
+      },
+      {
+        "id": "833",
+        "nom": "Haut Var"
+      },
+      {
+        "id": "839",
+        "nom": "Iles d'Hyeres"
+      },
+      {
+        "id": "835",
+        "nom": "Maures"
+      },
+      {
+        "id": "831",
+        "nom": "Monts Toulonnais"
+      },
+      {
+        "id": "837",
+        "nom": "Plateau de Canjuers"
+      },
+      {
+        "id": "832",
+        "nom": "Sainte Baume"
+      }
+    ]
+  },
+  "84": {
+    "nom": "Vaucluse (84)",
+    "massifs": [
+      {
+        "id": "841",
+        "nom": "Massif de Bollene-Uchaux"
+      },
+      {
+        "id": "848",
+        "nom": "Massif de Cadenet-Villelaure"
+      },
+      {
+        "id": "845",
+        "nom": "Massif de l'enclave des papes"
+      },
+      {
+        "id": "847",
+        "nom": "Massif de la plaine du Comtat"
+      },
+      {
+        "id": "8414",
+        "nom": "Massif de la vallee d'Apt"
+      },
+      {
+        "id": "849",
+        "nom": "Massif de la vallee du Rhone"
+      },
+      {
+        "id": "844",
+        "nom": "Massif de Rasteau-Cairanne"
+      },
+      {
+        "id": "846",
+        "nom": "Massif des collines Basse Durance"
+      },
+      {
+        "id": "842",
+        "nom": "Massif des collines du pays Voconce"
+      },
+      {
+        "id": "8412",
+        "nom": "Massif des dentelles de Montmirail"
+      },
+      {
+        "id": "8413",
+        "nom": "Massif des Monts de Vaucluse"
+      },
+      {
+        "id": "8411",
+        "nom": "Massif du grand Luberon"
+      },
+      {
+        "id": "843",
+        "nom": "Massif du Mont Ventoux"
+      },
+      {
+        "id": "8415",
+        "nom": "Massif du Mont Ventoux Sommet"
+      },
+      {
+        "id": "8410",
+        "nom": "Massif du petit Luberon"
+      }
+    ]
+  }
+}
