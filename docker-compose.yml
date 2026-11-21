@@ -2,9 +2,9 @@
 # Réglages dans .env (voir .env.example). Les données sont dans le volume « data ».
 # Le site écoute sur 127.0.0.1:<PORT> : placer devant un reverse proxy HTTPS (voir docker/nginx-site.conf).
 services:
-  risquemassif:
+  risqueincendie:
     build: .
-    image: risquemassif
+    image: risqueincendie
     env_file: .env
     ports:
       - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"

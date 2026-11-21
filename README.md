@@ -1,4 +1,6 @@
-# Prévisions des massifs — Nature Environnement
+# risqueincendie
+
+**Prévisions des massifs pour les camps Nature Environnement**
 
 Site qui affiche, pour les camps Nature Environnement des Scouts et Guides de France, l'accès aux massifs forestiers (risque d'incendie) aujourd'hui et demain, et qui prévient chaque soir les membres d'un camp par mail.
 
@@ -106,9 +108,9 @@ Le site écoute sur `127.0.0.1:<PORT>`. Il doit être placé derrière un revers
 ```bash
 git pull && docker compose up -d --build                                  # mise à jour
 docker compose logs -f                                                    # journal
-docker compose exec risquemassif node server/cli.mjs list-users           # comptes déjà connectés
-docker compose exec risquemassif node server/cli.mjs backup               # sauvegarde dans /data/backups
-docker compose cp risquemassif:/data/backups ./backups                    # récupérer les sauvegardes
+docker compose exec risqueincendie node server/cli.mjs list-users           # comptes déjà connectés
+docker compose exec risqueincendie node server/cli.mjs backup               # sauvegarde dans /data/backups
+docker compose cp risqueincendie:/data/backups ./backups                    # récupérer les sauvegardes
 ```
 
 Lors du passage depuis une version avec comptes à mot de passe, ces comptes sont supprimés. Les contacts des camps deviennent des participants et continuent à recevoir les mails.

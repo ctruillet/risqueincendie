@@ -6,7 +6,7 @@
   "failureFactor": 5,
   "clients": [
     {
-      "clientId": "ne-local",
+      "clientId": "risqueincendie-local",
       "name": "Prévisions des massifs (local)",
       "enabled": true,
       "publicClient": false,

@@ -8,7 +8,7 @@
 #   Site            http://localhost:3000   (comptes 100000001, 100000002, 100000003 ; mot de passe « chef »)
 #   Mails reçus     http://localhost:8025
 #   Admin Keycloak  http://localhost:8180   (admin / admin)
-name: ne-dev
+name: risqueincendie-dev
 
 services:
   site:
@@ -21,7 +21,7 @@ services:
       COOKIE_SECURE: "0"
       INTRANET_URL: http://keycloak:8080
       INTRANET_REALM: sgdf_local
-      INTRANET_CLIENT_ID: ne-local
+      INTRANET_CLIENT_ID: risqueincendie-local
       INTRANET_CLIENT_SECRET: secret-de-developpement-local # gitleaks:allow (Keycloak local uniquement)
       INTRANET_API_URL: http://intranet-api:8080
       SMTP_HOST: mailpit

@@ -1,5 +1,5 @@
 {
-  "name": "ne-massifs",
+  "name": "risqueincendie",
   "private": true,
   "type": "module",
   "description": "Prévisions d'accès aux massifs pour les camps SGDF, avec admin et notifications par mail",

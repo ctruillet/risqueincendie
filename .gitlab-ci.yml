@@ -25,7 +25,7 @@ include:
   # Ce composant construit l'image conteneur de l'application
   - component: $CI_SERVER_FQDN/sgdf/projets-benevoles/pnb-cicd/container@v1.4.1
     inputs:
-      image_name: ne
+      image_name: risqueincendie
 
   # Ce composant déploie en préproduction et en production
   # - component: $CI_SERVER_FQDN/sgdf/projets-benevoles/pnb-cicd/deploy@v1.4.1

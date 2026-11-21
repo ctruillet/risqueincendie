@@ -21,7 +21,7 @@ pied_de_page:
     - texte: Données personnelles
       adresse: /donnees-personnelles
     - texte: Code source
-      adresse: https://github.com/ctruillet/ne
+      adresse: https://github.com/ctruillet/risqueincendie
 
 # Chaque page est servie à l'adresse /<clé>, par exemple /mentions-legales
 pages:
@@ -44,7 +44,7 @@ pages:
           Les niveaux de risque et les consignes d'accès aux massifs sont publiés par les préfectures sur [risque-prevention-incendie.fr](https://www.risque-prevention-incendie.fr). Seuls ces arrêtés et la carte officielle font foi : vérifiez-les avant toute sortie.
       - titre: Licence
         texte: |
-          Le code du site est libre, sous licence WTFPL : vous pouvez en faire ce que vous voulez. Il est disponible sur [GitHub](https://github.com/ctruillet/ne).
+          Le code du site est libre, sous licence WTFPL : vous pouvez en faire ce que vous voulez. Il est disponible sur [GitHub](https://github.com/ctruillet/risqueincendie).
 
           Les éléments repris d'autres projets gardent leur licence : design system SGDF (MIT), icônes Font Awesome Free (CC BY 4.0), polices Raleway, Sarabun et Caveat Brush (SIL Open Font License).
 
