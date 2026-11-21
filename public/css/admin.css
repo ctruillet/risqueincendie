@@ -100,6 +100,17 @@ legend { font-family: var(--sgdf-font-serif); font-weight: 700; padding: 0 6px; 
 .membre-qui strong { overflow-wrap: anywhere; }
 .membre-qui small { color: var(--text-muted); overflow-wrap: anywhere; }
 .membre .champ-select { flex: 0 0 8.5rem; }
+.membre-fin { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.8rem; color: var(--text-muted); }
+.champ-date {
+    height: 1.9rem;
+    padding: 0 0.4rem;
+    border: 1px solid var(--sgdf-color-border);
+    border-radius: var(--sgdf-border-radius-medium);
+    background: var(--sgdf-color-bg-default);
+    color: var(--text-color);
+    font: inherit;
+}
+.champ-date:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 1px; }
 
 .ajout-membre { width: 100%; display: grid; grid-template-columns: 1fr 8.5rem auto; gap: 8px; align-items: end; }
 .champ-petit { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: var(--sgdf-font-weight-semibold); }

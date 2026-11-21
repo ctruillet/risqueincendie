@@ -258,13 +258,18 @@ function afficherMembres() {
     $('#membres').innerHTML = membresEdites.length === 0
         ? '<li class="vide">Aucun membre pour l\'instant.</li>'
         : membresEdites.map((m, i) => {
-            const details = [
-                ...(m.nom ? [m.email, m.identifiant && `n° ${m.identifiant}`] : ['Pas encore connecté']),
-                m.role === 'participant' && m.jusqu_au && finAbonnement(m.jusqu_au)
-            ].filter(Boolean).join(' · ');
+            const details = (m.nom ? [m.email, m.identifiant && `n° ${m.identifiant}`] : ['Pas encore connecté'])
+                .filter(Boolean).join(' · ');
+            // Participant : date de fin des mails, vide = fin de l'été
+            const fin = m.jusqu_au && m.jusqu_au !== finSaison ? m.jusqu_au : '';
+            const date = m.role === 'participant' ? `
+                    <label class="membre-fin">Mails jusqu'au
+                        <input type="date" class="champ-date" value="${escapeHtml(fin)}" min="${getIsoDate(0)}" max="${finSaison}">
+                        <span>${fin ? '' : 'fin de l\'été'}</span>
+                    </label>` : '';
             return `
             <li class="membre" data-i="${i}">
-                <span class="membre-qui"><strong>${escapeHtml(nomMembre(m))}</strong><small>${escapeHtml(details)}</small></span>
+                <span class="membre-qui"><strong>${escapeHtml(nomMembre(m))}</strong><small>${escapeHtml(details)}</small>${date}</span>
                 <select class="champ-select" aria-label="Rôle de ${escapeHtml(nomMembre(m))}">
                     <option value="participant" ${m.role === 'participant' ? 'selected' : ''}>Participant</option>
                     <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
@@ -276,7 +281,15 @@ function afficherMembres() {
 
 $('#membres').addEventListener('change', e => {
     const li = e.target.closest('.membre');
-    if (li) membresEdites[li.dataset.i].role = e.target.value;
+    if (!li) return;
+    const membre = membresEdites[li.dataset.i];
+    if (e.target.matches('.champ-date')) {
+        membre.jusqu_au = e.target.value || null;
+        e.target.nextElementSibling.textContent = e.target.value ? '' : 'fin de l\'été';
+        return;
+    }
+    membre.role = e.target.value;
+    afficherMembres();
 });
 
 $('#membres').addEventListener('click', e => {

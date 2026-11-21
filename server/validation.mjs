@@ -2,6 +2,7 @@
 import { HttpError } from './http.mjs';
 import { listCamps } from './db.mjs';
 import { regles, massifs } from './config.mjs';
+import { getParisDate } from './history.mjs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
@@ -44,7 +45,7 @@ function validerMembre(m) {
     if (!email && !identifiant) throw new HttpError(400, `Indiquer l'e-mail ou le numéro d'adhérent de ${qui}`);
     if (email && !EMAIL_RE.test(email)) throw new HttpError(400, `E-mail invalide : ${email}`);
     if (identifiant && !NUMERO_RE.test(identifiant)) throw new HttpError(400, `Numéro d'adhérent invalide (9 chiffres) : ${identifiant}`);
-    const jusquAu = m.jusqu_au && /^\d{4}-\d{2}-\d{2}$/.test(m.jusqu_au) ? m.jusqu_au : null;
+    const jusquAu = m.role === 'admin' ? null : validerFinAbonnement(m.jusqu_au, getParisDate(0));
     return { nom, email, identifiant, role: m.role === 'admin' ? 'admin' : 'participant', jusqu_au: jusquAu };
 }
 
