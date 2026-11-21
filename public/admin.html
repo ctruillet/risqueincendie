@@ -33,27 +33,24 @@
 
         <sgdf-tab-group id="vue-app" active="camps" hidden>
             <sgdf-tab panel="camps">Camps</sgdf-tab>
-            <sgdf-tab panel="envois" id="onglet-envois" hidden>Mails envoyés</sgdf-tab>
+            <sgdf-tab panel="envois" id="onglet-envois" hidden>Mails</sgdf-tab>
 
             <sgdf-tab-panel name="camps">
                 <!-- Liste des camps -->
                 <div id="vue-liste" class="pile">
-                    <sgdf-callout id="bloc-releve" variant="info" title="Relevé des prévisions" hidden>
-                        <div id="status-texte" class="status-texte">…</div>
-                        <div class="actions">
-                            <sgdf-button id="btn-passage" size="small" appearance="outlined">Vérifier les prévisions maintenant</sgdf-button>
-                            <sgdf-button id="btn-test-mail" size="small" appearance="outlined">M'envoyer un mail de test</sgdf-button>
-                        </div>
-                    </sgdf-callout>
-
-                    <div id="liste-camps" class="pile"></div>
-
-                    <sgdf-button id="btn-nouveau" variant="primary" hidden>Nouveau camp</sgdf-button>
+                    <div class="liste-entete">
+                        <p id="nb-camps" class="liste-compte"></p>
+                        <sgdf-button id="btn-nouveau" size="small" variant="primary" hidden>Nouveau camp</sgdf-button>
+                    </div>
+                    <div id="liste-camps" class="pile-serree"></div>
                 </div>
 
                 <!-- Création ou modification d'un camp -->
                 <sgdf-card id="vue-edition" hidden>
-                    <h2 slot="header" id="titre-edition">Nouveau camp</h2>
+                    <div slot="header" class="edition-entete">
+                        <sgdf-button id="btn-retour" size="small" appearance="text">← Mes camps</sgdf-button>
+                        <h2 id="titre-edition">Nouveau camp</h2>
+                    </div>
                     <form id="form-camp" class="form">
                         <sgdf-input name="titre" label="Nom du camp" maxlength="120" required
                                     placeholder="Camp Pionniers (Sainte-Baume)"></sgdf-input>
@@ -83,19 +80,27 @@
                                 </label>
                                 <sgdf-button id="btn-ajout-membre" size="small" appearance="outlined">Ajouter</sgdf-button>
                             </div>
-                            <p class="hint-form"><strong>Responsable</strong> : modifie le camp et ses membres. <strong>Participant</strong> : voit le camp sur l'accueil et peut s'en retirer. Tous reçoivent les prévisions par mail. Le nom s'affiche à la première connexion de la personne avec l'Intranet.</p>
+                            <p class="hint-form">Les <strong>responsables</strong> modifient le camp. Tous les membres reçoivent les mails. Le nom s'affiche à la première connexion de la personne.</p>
                         </fieldset>
 
                         <sgdf-callout class="form-error" variant="danger" hidden></sgdf-callout>
-                        <div class="actions">
+                        <div class="actions actions-form">
                             <sgdf-button submit variant="primary">Enregistrer</sgdf-button>
                             <sgdf-button id="btn-annuler" appearance="outlined">Annuler</sgdf-button>
+                            <sgdf-button id="btn-supprimer" appearance="text" variant="danger" hidden>Supprimer le camp</sgdf-button>
                         </div>
                     </form>
                 </sgdf-card>
             </sgdf-tab-panel>
 
             <sgdf-tab-panel name="envois">
+                <sgdf-callout id="bloc-releve" variant="info" title="Relevé des prévisions" hidden>
+                    <div id="status-texte" class="status-texte">…</div>
+                    <div class="actions">
+                        <sgdf-button id="btn-passage" size="small" appearance="outlined">Vérifier les prévisions maintenant</sgdf-button>
+                        <sgdf-button id="btn-test-mail" size="small" appearance="outlined">M'envoyer un mail de test</sgdf-button>
+                    </div>
+                </sgdf-callout>
                 <sgdf-card>
                     <h2 slot="header">50 derniers mails</h2>
                     <div id="liste-envois"></div>

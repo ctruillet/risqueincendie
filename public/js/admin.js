@@ -78,6 +78,7 @@ function confirmer({ titre, texte, bouton = 'Confirmer', variante = 'danger' }) 
 
 const valeur = (racine, nom) => String(racine.querySelector(`[name=${nom}]`)?.value ?? '').trim();
 const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year: 'numeric' });
+const dateCourte = iso => formatDate(iso, { day: 'numeric', month: 'long' });
 // Nom affiché d'un membre : son nom (connu après sa première connexion), sinon ce qu'a saisi l'admin
 const nomMembre = m => m.nom || m.email || (m.identifiant ? `N° ${m.identifiant}` : 'pas encore connecté');
 
@@ -114,27 +115,36 @@ $('#btn-test-mail').addEventListener('click', e => action(e.currentTarget, async
 
 // --- Liste des camps ---
 
-function etiquetteCamp(camp) {
-    const tag = (variante, texte) => `<sgdf-tag slot="header-actions" variant="${variante}" size="small">${texte}</sgdf-tag>`;
-    if (!camp.debut) return tag('neutral', 'Sans dates');
-    if (camp.fin < getIsoDate(0)) return tag('neutral', 'Terminé');
-    if (camp.debut <= getIsoDate(0)) return tag('success', 'En cours');
-    return tag('warning', 'À venir');
+// État du camp : en cours, à venir, terminé ou sans dates
+function etatCamp(camp) {
+    const aujourdhui = getIsoDate(0);
+    if (!camp.debut) return { cle: 'sans-dates', variante: 'neutral', texte: 'Sans dates' };
+    if (camp.fin < aujourdhui) return { cle: 'termine', variante: 'neutral', texte: 'Terminé' };
+    if (camp.debut <= aujourdhui) return { cle: 'en-cours', variante: 'success', texte: 'En cours' };
+    return { cle: 'a-venir', variante: 'warning', texte: 'À venir' };
 }
 
-function listeNoms(membres, role) {
-    const noms = membres.filter(m => m.role === role).map(m => escapeHtml(nomMembre(m)));
-    return noms.length ? noms.join(', ') : 'aucun';
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+const periode = camp => camp.debut ? `du ${dateCourte(camp.debut)} au ${dateLongue(camp.fin)}` : 'Dates à fixer';
+
+// Une ligne sur les membres : les responsables par leur nom, les participants par leur nombre
+function resumeMembres(camp) {
+    const responsables = camp.membres.filter(m => m.role === 'admin').map(m => escapeHtml(nomMembre(m)));
+    const nomResp = responsables.length
+        ? `${responsables.length > 1 ? 'Responsables' : 'Responsable'} : ${responsables.join(', ')}`
+        : 'Aucun responsable';
+    if (camp.role !== 'admin') return nomResp;
+    const n = camp.membres.filter(m => m.role === 'participant').length;
+    return `${nomResp} · ${n ? pluriel(n, 'participant') : 'aucun participant'}`;
 }
 
 function boutonsCamp(camp) {
     const admin = camp.role === 'admin';
     return [
         admin && '<sgdf-button size="small" variant="primary" data-action="modifier">Modifier</sgdf-button>',
-        admin && `<sgdf-button size="small" appearance="outlined" data-action="envoyer"
+        admin && `<sgdf-button size="small" appearance="text" data-action="envoyer"
             ${camp.membres.some(m => m.email) ? '' : 'disabled'}>Envoyer la prévision de demain</sgdf-button>`,
-        camp.membre && '<sgdf-button size="small" appearance="outlined" data-action="quitter">Me retirer de ce camp</sgdf-button>',
-        utilisateur.superAdmin && '<sgdf-button size="small" appearance="text" variant="danger" data-action="supprimer">Supprimer le camp</sgdf-button>'
+        camp.membre && '<sgdf-button size="small" appearance="text" data-action="quitter">Me retirer</sgdf-button>'
     ].filter(Boolean).join('');
 }
 
@@ -147,19 +157,24 @@ function afficherCamps() {
     const liste = $('#liste-camps');
     liste.innerHTML = camps.length === 0
         ? '<p class="vide">Vous n\'êtes membre d\'aucun camp pour l\'instant. Abonnez-vous à un camp depuis l\'accueil, ou demandez à un responsable du camp de vous ajouter.</p>'
-        : camps.map(camp => `
-        <sgdf-card class="camp-item" data-id="${escapeHtml(camp.id)}">
-            <h3 slot="header" class="camp-titre">${escapeHtml(camp.titre)}</h3>
-            ${etiquetteCamp(camp)}
-            <dl class="camp-infos">
-                ${camp.membre ? `<dt>Mon rôle</dt><dd>${camp.role === 'admin' ? 'Responsable du camp' : `Participant, ${finAbonnement(camp.jusqu_au)}`}</dd>` : ''}
-                <dt>Dates</dt><dd>${camp.debut ? `du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'pas encore fixées'}</dd>
-                <dt>Massifs</dt><dd>${camp.zones.map(z => escapeHtml(z.label)).join(', ')}</dd>
-                <dt>${camp.membres.filter(m => m.role === 'admin').length > 1 ? 'Responsables' : 'Responsable'}</dt><dd>${listeNoms(camp.membres, 'admin')}</dd>
-                ${camp.role === 'admin' ? `<dt>Participants</dt><dd>${listeNoms(camp.membres, 'participant')}</dd>` : ''}
-            </dl>
-            <div slot="footer" class="actions">${boutonsCamp(camp)}</div>
-        </sgdf-card>`).join('');
+        : camps.map(camp => {
+            const etat = etatCamp(camp);
+            const monRole = !camp.membre ? ''
+                : camp.monRole === 'admin' ? 'Vous êtes responsable' : `Vos mails ${finAbonnement(camp.jusqu_au)}`;
+            return `
+        <article class="camp-item camp-${etat.cle}" data-id="${escapeHtml(camp.id)}">
+            <div class="camp-entete">
+                <h3 class="camp-titre">${escapeHtml(camp.titre)}</h3>
+                <sgdf-tag variant="${etat.variante}" size="small">${etat.texte}</sgdf-tag>
+            </div>
+            <p class="camp-ligne"><strong>${periode(camp)}</strong> · ${camp.zones.map(z => escapeHtml(z.label)).join(', ')}</p>
+            <p class="camp-ligne">${resumeMembres(camp)}</p>
+            ${monRole ? `<p class="camp-ligne camp-moi">${monRole}</p>` : ''}
+            <div class="actions">${boutonsCamp(camp)}</div>
+        </article>`;
+        }).join('');
+    const n = camps.length;
+    $('#nb-camps').textContent = n ? pluriel(n, 'camp') : '';
 }
 
 async function chargerCamps() {
@@ -191,7 +206,7 @@ $('#liste-camps').addEventListener('click', async e => {
     if (bouton.dataset.action === 'quitter') {
         if (!await confirmer({
             titre: 'Me retirer de ce camp',
-            texte: camp.role === 'admin'
+            texte: camp.monRole === 'admin'
                 ? `Vous ne serez plus responsable de « ${camp.titre} » et ne recevrez plus ses prévisions par mail.`
                 : `Vous ne recevrez plus les prévisions de « ${camp.titre} » par mail. Un responsable du camp pourra vous rajouter.`,
             bouton: 'Me retirer'
@@ -202,18 +217,22 @@ $('#liste-camps').addEventListener('click', async e => {
             notifier(`Vous n'êtes plus membre de « ${camp.titre} ».`);
         });
     }
-    if (bouton.dataset.action === 'supprimer') {
-        if (!await confirmer({
-            titre: 'Supprimer le camp',
-            texte: `Supprimer « ${camp.titre} » et la liste de ses membres ? L'historique des massifs est conservé.`,
-            bouton: 'Supprimer'
-        })) return;
-        return action(bouton, async () => {
-            await api(chemin, { method: 'DELETE' });
-            await chargerCamps();
-            notifier('Camp supprimé.');
-        });
-    }
+});
+
+// Suppression, depuis le formulaire du camp (responsable du site)
+$('#btn-supprimer').addEventListener('click', async e => {
+    const camp = campEdite;
+    if (!await confirmer({
+        titre: 'Supprimer le camp',
+        texte: `Supprimer « ${camp.titre} » et la liste de ses membres ? L'historique des massifs est conservé.`,
+        bouton: 'Supprimer'
+    })) return;
+    return action(e.currentTarget, async () => {
+        await api(`camps/${encodeURIComponent(camp.id)}`, { method: 'DELETE' });
+        await chargerCamps();
+        fermerEdition();
+        notifier('Camp supprimé.');
+    });
 });
 
 // --- Massifs du camp ---
@@ -332,7 +351,8 @@ function ouvrirEdition(camp = null) {
     campEdite = camp;
     const form = $('#form-camp');
     erreurForm();
-    $('#titre-edition').textContent = camp ? `Modifier « ${camp.titre} »` : 'Nouveau camp';
+    $('#titre-edition').textContent = camp ? camp.titre : 'Nouveau camp';
+    $('#btn-supprimer').hidden = !(camp && utilisateur.superAdmin);
     form.querySelector('[name=titre]').value = camp?.titre ?? '';
     form.querySelector('[name=debut]').value = camp?.debut ?? '';
     form.querySelector('[name=fin]').value = camp?.fin ?? '';
@@ -352,10 +372,12 @@ function ouvrirEdition(camp = null) {
 function fermerEdition() {
     $('#vue-edition').hidden = true;
     $('#vue-liste').hidden = false;
+    window.scrollTo({ top: 0 });
 }
 
 $('#btn-nouveau').addEventListener('click', () => ouvrirEdition());
 $('#btn-annuler').addEventListener('click', fermerEdition);
+$('#btn-retour').addEventListener('click', fermerEdition);
 
 // Le début fixe la date minimale de fin
 $('#form-camp [name=debut]').addEventListener('change', e => {

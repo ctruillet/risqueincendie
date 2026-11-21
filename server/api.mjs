@@ -28,7 +28,8 @@ function campsVisibles(user) {
             const role = user.superAdmin ? 'admin' : roles[camp.id];
             const membres = role === 'admin' ? camp.membres
                 : camp.membres.filter(m => m.role === 'admin').map(({ role: r, nom }) => ({ role: r, nom }));
-            return { ...camp, role, membre: Boolean(roles[camp.id]), membres };
+            // monRole : rôle réel de la personne dans le camp (le responsable du site y est peut-être participant)
+            return { ...camp, role, membre: Boolean(roles[camp.id]), monRole: roles[camp.id] ?? null, membres };
         });
 }
 
