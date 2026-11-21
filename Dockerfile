@@ -9,7 +9,7 @@ COPY public/ public/
 RUN npm run build
 
 # Étape 2 : image finale, un seul conteneur Node : site, admin, relevé des prévisions et mails.
-# Les données (base SQLite + historique.json) sont dans le volume /data.
+# Les données (base SQLite, historique compris) sont dans le volume /data.
 FROM node:24-alpine
 
 ENV NODE_ENV=production \
