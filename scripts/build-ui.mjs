@@ -2,10 +2,10 @@
 //   admin.js            composants de l'admin (chargés après la connexion)
 //   Les pages publiques n'utilisent que sgdf.css : leurs éléments reprennent le rendu SGDF en HTML/CSS.
 //   sgdf.css            tokens, thème, styles globaux et polices de la charte (servies localement)
-//   icons/              icônes chargées à la demande par sgdf-icon
+//   icons/              icônes utilisées, chargées à la demande par sgdf-icon
 // Lancé par « npm run build » et pendant la construction de l'image Docker.
 import { build } from 'esbuild';
-import { rmSync, mkdirSync, cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { rmSync, mkdirSync, cpSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 
@@ -39,8 +39,20 @@ await build({
     logLevel: 'warning'
 });
 
+// Icônes : seulement celles que les composants ou nos pages peuvent demander (noms cités entre
+// guillemets dans le code), pas les ~1 400 de la bibliothèque
+const textes = [readFileSync(join(sortie, 'admin.js'), 'utf8'),
+    ...['admin.html', 'js/admin.js'].map(f => readFileSync(join(racine, 'public', f), 'utf8'))].join('\n');
+const noms = new Set([...textes.matchAll(/["'`]([a-z0-9]+(?:-[a-z0-9]+)*)["'`]/g)].map(m => m[1]));
+let copiees = 0;
 for (const bibliotheque of ['solid', 'regular', 'sgdf-picto']) {
-    cpSync(join(sgdf, 'icons', bibliotheque), join(sortie, 'icons', bibliotheque), { recursive: true });
+    const source = join(sgdf, 'icons', bibliotheque);
+    mkdirSync(join(sortie, 'icons', bibliotheque), { recursive: true });
+    for (const fichier of readdirSync(source)) {
+        if (!noms.has(fichier.replace(/\.svg$/, ''))) continue;
+        cpSync(join(source, fichier), join(sortie, 'icons', bibliotheque, fichier));
+        copiees++;
+    }
 }
 // Licences des bibliothèques embarquées dans public/ui (MIT : la notice doit accompagner les fichiers)
 const licences = [
@@ -57,4 +69,4 @@ licences.push('== Icônes Font Awesome Free (dans icons/) : CC BY 4.0, notice da
     + '== Polices Raleway, Sarabun, Caveat Brush (dans polices/) : SIL Open Font License 1.1\n');
 writeFileSync(join(sortie, 'LICENCES.txt'), licences.join('\n'));
 
-console.log('✅ public/ui construit');
+console.log(`✅ public/ui construit (${copiees} icônes)`);
