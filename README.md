@@ -6,7 +6,7 @@ Site qui affiche, pour les camps Nature Environnement des Scouts et Guides de Fr
 
 - Prévisions officielles des préfectures, en direct et en historique, pour 13 départements.
 - Connexion avec les identifiants de l'**Intranet SGDF** : chacun retrouve ses camps.
-- Les admins d'un camp en gèrent les dates, les massifs et les membres.
+- Les responsables d'un camp en gèrent les dates, les massifs et les membres.
 - Interface aux couleurs de la charte SGDF ([sgdf-ui](https://gitlab.com/sgdf/projets-benevoles/sgdf-ui)), utilisable hors ligne sur téléphone.
 
 > Initiative personnelle et bénévole, non éditée par les Scouts et Guides de France. Seuls les arrêtés préfectoraux et la [carte officielle](https://www.risque-prevention-incendie.fr) font foi.
@@ -48,14 +48,14 @@ Aucun mot de passe ni jeton n'est conservé. Le compte est créé à la premièr
 
 | Rôle | Qui | Peut |
 |---|---|---|
-| Responsable du site | adhérents de la structure **988220500** (fonction principale ou secondaire) | tout : créer et supprimer les camps, en nommer les admins, lancer un relevé, tester l'envoi des mails |
-| Admin d'un camp | membre du camp avec le rôle « Admin » | modifier ce camp (nom, dates, massifs, membres), envoyer la prévision tout de suite |
-| Participant d'un camp | ajouté par un admin, ou abonné de lui-même | voir le camp dans « Mes camps », s'en retirer (après confirmation) |
+| Responsable du site | adhérents de la structure **988220500** (fonction principale ou secondaire) | tout : créer et supprimer les camps, en nommer les responsables, lancer un relevé, tester l'envoi des mails |
+| Responsable d'un camp | membre du camp avec le rôle « Responsable » | modifier ce camp (nom, dates, massifs, membres), envoyer la prévision tout de suite |
+| Participant d'un camp | ajouté par un responsable du camp, ou abonné de lui-même | voir le camp dans « Mes camps », s'en retirer (après confirmation) |
 | Toute personne connectée | | s'abonner à un camp comme participant, jusqu'à une date choisie ou jusqu'à la fin de l'été |
 
 - Un membre est ajouté avec son **e-mail** ou son **numéro d'adhérent** (9 chiffres). À sa connexion, il est reconnu par l'un ou l'autre. Son nom et l'information manquante sont alors complétés depuis l'Intranet.
-- Un participant est retiré du camp après sa date de fin d'abonnement. **À la fin de l'été** (dernier jour de `SEASON`, le 30 septembre par défaut), tous les participants sont retirés. Les admins restent.
-- Un camp garde toujours au moins un admin : le dernier admin ne peut ni se retirer ni se rétrograder. Le responsable du site, lui, le peut.
+- Un participant est retiré du camp après sa date de fin d'abonnement. **À la fin de l'été** (dernier jour de `SEASON`, le 30 septembre par défaut), tous les participants sont retirés. Les responsables restent.
+- Un camp garde toujours au moins un responsable : le dernier ne peut ni se retirer ni se rétrograder. Le responsable du site, lui, le peut.
 
 ## Démarrage rapide en local
 
@@ -76,7 +76,7 @@ Comptes de test, avec le mot de passe `chef` (définis dans [`dev/sgdf_local-rea
 | Identifiant | Nom | Rôle à tester |
 |---|---|---|
 | `100000001` | Camille Responsable | responsable du site (structure 988220500) |
-| `100000002` | Dominique Admin | à nommer admin d'un camp (e-mail `dominique.admin@example.org`) |
+| `100000002` | Dominique Admin | à nommer responsable d'un camp (e-mail `dominique.admin@example.org`) |
 | `100000003` | Alex Participant | à ajouter comme participant (par son numéro) |
 
 - Après une modification du code, relancer la même commande.
@@ -212,7 +212,7 @@ Les données viennent de [risque-prevention-incendie.fr](https://www.risque-prev
 ## Sécurité et données personnelles
 
 - **Connexion** : identifiants vérifiés par l'Intranet, jamais stockés. Session par cookie `HttpOnly`, `Secure`, `SameSite=Strict`, valable 30 jours, avec 10 tentatives ratées au plus par adresse IP et par quart d'heure.
-- **Droits** : vérifiés par le serveur à chaque requête. Les dates d'un camp ne sont montrées qu'à ses membres, et les coordonnées des membres qu'à ses admins. `/camps.json` ne publie que le nom et les massifs.
+- **Droits** : vérifiés par le serveur à chaque requête. Les dates d'un camp ne sont montrées qu'à ses membres, et les coordonnées des membres qu'à ses responsables. `/camps.json` ne publie que le nom et les massifs.
 - **En-têtes** : Content-Security-Policy stricte sur toutes les pages (aucun script ni style en ligne, aucun site tiers), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`. HSTS est ajouté par le reverse proxy.
 - **Requêtes** : JSON obligatoire et contrôle de l'origine pour toute modification (protection CSRF), corps limité à 200 Ko, chemins de fichiers contrôlés, données saisies validées (caractères de contrôle retirés), envoi manuel des mails limité à un par minute et par camp.
 - **Conservation** : participants retirés à la fin de leur abonnement (au plus tard à la fin de l'été), comptes supprimés après 3 ans sans connexion, journal des mails après 1 an (purge quotidienne automatique), sessions expirées purgées.

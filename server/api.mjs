@@ -40,18 +40,18 @@ function exigerSuperAdmin(user) {
 
 function exigerAdmin(user, camp) {
     if (!user.superAdmin && rolesDe(user)[camp.id] !== 'admin') {
-        throw new HttpError(403, "Vous n'êtes pas admin de ce camp");
+        throw new HttpError(403, "Vous n'êtes pas responsable de ce camp");
     }
 }
 
 // Admin d'au moins un camp (journal des mails)
 function exigerUnCamp(user) {
     if (!user.superAdmin && !Object.values(rolesDe(user)).includes('admin')) {
-        throw new HttpError(403, "Vous n'êtes admin d'aucun camp");
+        throw new HttpError(403, "Vous n'êtes responsable d'aucun camp");
     }
 }
 
-const ADMIN_REQUIS = 'Le camp doit garder au moins un admin : nommez-en un autre avant';
+const ADMIN_REQUIS = 'Le camp doit garder au moins un responsable : nommez-en un autre avant';
 
 // Envoi manuel des prévisions : une fois par minute et par camp au plus
 const derniersEnvois = new Map();
@@ -89,7 +89,7 @@ async function routeMesCamps(req, res, user, id) {
     // S'abonner à un camp, ou changer la date de fin de son abonnement
     if (req.method === 'POST' && id) {
         if (!getCamp(id)) throw new HttpError(404, 'Camp introuvable');
-        if (roles[id] === 'admin') throw new HttpError(400, 'Vous êtes déjà admin de ce camp');
+        if (roles[id] === 'admin') throw new HttpError(400, 'Vous êtes déjà responsable de ce camp');
         const jusquAu = membres.abonner(id, user, validerFinAbonnement((await lireJson(req)).jusqu_au, getParisDate(0)));
         console.log(`🔔 ${user.identifiant} abonné au camp ${id} jusqu'au ${jusquAu}`);
         return json(req, res, 200, { ok: true, jusqu_au: jusquAu });

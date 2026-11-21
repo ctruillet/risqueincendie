@@ -146,16 +146,16 @@ const finAbonnement = jusquAu => jusquAu
 function afficherCamps() {
     const liste = $('#liste-camps');
     liste.innerHTML = camps.length === 0
-        ? '<p class="vide">Vous n\'êtes membre d\'aucun camp pour l\'instant. Abonnez-vous à un camp depuis l\'accueil, ou demandez à un admin de vous ajouter.</p>'
+        ? '<p class="vide">Vous n\'êtes membre d\'aucun camp pour l\'instant. Abonnez-vous à un camp depuis l\'accueil, ou demandez à un responsable du camp de vous ajouter.</p>'
         : camps.map(camp => `
         <sgdf-card class="camp-item" data-id="${escapeHtml(camp.id)}">
             <h3 slot="header" class="camp-titre">${escapeHtml(camp.titre)}</h3>
             ${etiquetteCamp(camp)}
             <dl class="camp-infos">
-                ${camp.membre ? `<dt>Mon rôle</dt><dd>${camp.role === 'admin' ? 'Admin' : `Participant, ${finAbonnement(camp.jusqu_au)}`}</dd>` : ''}
+                ${camp.membre ? `<dt>Mon rôle</dt><dd>${camp.role === 'admin' ? 'Responsable du camp' : `Participant, ${finAbonnement(camp.jusqu_au)}`}</dd>` : ''}
                 <dt>Dates</dt><dd>${camp.debut ? `du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'pas encore fixées'}</dd>
                 <dt>Massifs</dt><dd>${camp.zones.map(z => escapeHtml(z.label)).join(', ')}</dd>
-                <dt>Admins</dt><dd>${listeNoms(camp.membres, 'admin')}</dd>
+                <dt>${camp.membres.filter(m => m.role === 'admin').length > 1 ? 'Responsables' : 'Responsable'}</dt><dd>${listeNoms(camp.membres, 'admin')}</dd>
                 ${camp.role === 'admin' ? `<dt>Participants</dt><dd>${listeNoms(camp.membres, 'participant')}</dd>` : ''}
             </dl>
             <div slot="footer" class="actions">${boutonsCamp(camp)}</div>
@@ -192,8 +192,8 @@ $('#liste-camps').addEventListener('click', async e => {
         if (!await confirmer({
             titre: 'Me retirer de ce camp',
             texte: camp.role === 'admin'
-                ? `Vous ne serez plus admin de « ${camp.titre} » et ne recevrez plus ses prévisions par mail.`
-                : `Vous ne recevrez plus les prévisions de « ${camp.titre} » par mail. Un admin du camp pourra vous rajouter.`,
+                ? `Vous ne serez plus responsable de « ${camp.titre} » et ne recevrez plus ses prévisions par mail.`
+                : `Vous ne recevrez plus les prévisions de « ${camp.titre} » par mail. Un responsable du camp pourra vous rajouter.`,
             bouton: 'Me retirer'
         })) return;
         return action(bouton, async () => {
@@ -272,7 +272,7 @@ function afficherMembres() {
                 <span class="membre-qui"><strong>${escapeHtml(nomMembre(m))}</strong><small>${escapeHtml(details)}</small>${date}</span>
                 <select class="champ-select" aria-label="Rôle de ${escapeHtml(nomMembre(m))}">
                     <option value="participant" ${m.role === 'participant' ? 'selected' : ''}>Participant</option>
-                    <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Responsable</option>
                 </select>
                 <sgdf-icon-button name="trash-can" library="solid" label="Retirer ${escapeHtml(nomMembre(m))}"></sgdf-icon-button>
             </li>`;
