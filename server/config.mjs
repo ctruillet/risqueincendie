@@ -9,6 +9,8 @@ const env = process.env;
 export const PORT = Number(env.PORT ?? 3000);
 export const PUBLIC_DIR = env.PUBLIC_DIR ?? join(racine, 'public');
 export const SEED_DIR = env.SEED_DIR ?? join(racine, 'seed');
+// Pied de page et pages obligatoires (mentions légales…), modifiables sans toucher au code
+export const CONTENU_FICHIER = env.CONTENU_FICHIER ?? join(racine, 'contenu', 'site.yml');
 export const DATA_DIR = env.DATA_DIR ?? join(racine, 'data');
 export const HISTORY_PATH = join(DATA_DIR, 'historique.json');
 

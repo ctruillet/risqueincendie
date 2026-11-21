@@ -257,6 +257,17 @@ export const sessions = {
     purge: () => db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now())
 };
 
+// --- Durées de conservation (annoncées sur la page « Données personnelles ») ---
+
+export function purgerAnciennesDonnees() {
+    const envoisSupprimes = db.prepare("DELETE FROM envois WHERE sent_at < datetime('now', '-1 year')").run().changes;
+    const comptesSupprimes = db.prepare("DELETE FROM users WHERE derniere_connexion < datetime('now', '-3 years')").run().changes;
+    db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
+    if (envoisSupprimes || comptesSupprimes) {
+        console.log(`🧹 Purge : ${envoisSupprimes} mail(s) du journal, ${comptesSupprimes} compte(s) inactif(s).`);
+    }
+}
+
 // --- Journal des envois ---
 
 export const envois = {

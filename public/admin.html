@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
-    <meta name="description" content="Administration des camps Nature Environnement : dates, massifs et membres prévenus par mail.">
-    <title>Administration – Nature Environnement</title>
+    <meta name="description" content="Gestion de ses camps Nature Environnement : dates, massifs et membres prévenus par mail.">
+    <title>Mes camps – Nature Environnement</title>
     <link rel="stylesheet" href="ui/sgdf.css">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/admin.css">
@@ -26,22 +26,21 @@
 
     <main class="container">
         <div class="titre-page">
-            <p class="surtitre">Administration</p>
+            <p class="surtitre">Gestion</p>
             <h1 id="titre-admin">Mes camps</h1>
             <p class="chapeau">Dates, massifs et membres prévenus par mail la veille de chaque jour de camp.</p>
         </div>
 
-        <!-- Connecté, mais admin d'aucun camp -->
+        <!-- Connecté, mais membre d'aucun camp -->
         <section id="vue-aucun" class="carte carte-etroite" hidden>
-            <h2>Aucun camp à gérer</h2>
-            <p>Vous n'êtes admin d'aucun camp. Les camps où vous êtes participant sont mis en avant sur l'accueil.</p>
-            <p>Pour gérer un camp, demandez à l'un de ses admins de vous nommer admin.</p>
+            <h2>Aucun camp</h2>
+            <p>Vous n'êtes membre d'aucun camp pour l'instant. Demandez à un admin de votre camp de vous ajouter, avec votre e-mail ou votre numéro d'adhérent.</p>
             <a href="./" class="bouton">Retour à l'accueil</a>
         </section>
 
         <sgdf-tab-group id="vue-app" active="camps" hidden>
             <sgdf-tab panel="camps">Camps</sgdf-tab>
-            <sgdf-tab panel="envois">Mails envoyés</sgdf-tab>
+            <sgdf-tab panel="envois" id="onglet-envois" hidden>Mails envoyés</sgdf-tab>
 
             <sgdf-tab-panel name="camps">
                 <!-- Liste des camps -->
@@ -121,14 +120,7 @@
 
     <sgdf-toast id="toast"></sgdf-toast>
 
-    <footer class="pied">
-        <div class="pied-corps">
-            <div class="pied-haut">
-                <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
-            </div>
-            <p class="pied-legal">Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France</p>
-        </div>
-    </footer>
+    <!-- pied-de-page -->
 
     <template id="tpl-zone">
         <div class="ligne-form zone-ligne">

@@ -1,0 +1,83 @@
+# Contenu du site modifiable sans toucher au code : pied de page et pages obligatoires.
+# Le site relit ce fichier dès qu'il est enregistré (pas besoin de redémarrer).
+# En cas d'erreur, le journal du site l'indique et l'ancienne version reste affichée.
+#
+# Mise en forme des textes :
+#   - une ligne vide sépare deux paragraphes ;
+#   - des lignes commençant par « - » forment une liste ;
+#   - **texte** pour du gras ;
+#   - [texte du lien](https://adresse), [page du site](/mentions-legales) ou [e-mail](mailto:adresse@exemple.fr).
+# Les « [À compléter] » sont à remplacer avant la mise en ligne.
+
+pied_de_page:
+  textes:
+    - Prévisions issues des préfectures, publiées sur [risque-prevention-incendie.fr](https://www.risque-prevention-incendie.fr).
+    - Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France.
+  liens:
+    - texte: Carte officielle
+      adresse: https://www.risque-prevention-incendie.fr
+    - texte: Mentions légales
+      adresse: /mentions-legales
+    - texte: Données personnelles
+      adresse: /donnees-personnelles
+    - texte: Code source
+      adresse: https://github.com/ctruillet/ne
+
+# Chaque page est servie à l'adresse /<clé>, par exemple /mentions-legales
+pages:
+  mentions-legales:
+    titre: Mentions légales
+    description: Éditeur, hébergeur et licence du site Prévisions des massifs.
+    sections:
+      - titre: Éditeur
+        texte: |
+          Ce site est une initiative personnelle et bénévole, sans but commercial, pour les camps Nature Environnement. Il n'est pas édité par l'association des Scouts et Guides de France.
+
+          Responsable de la publication : [À compléter : nom ou pseudonyme].
+
+          Contact : [À compléter : adresse e-mail de contact](mailto:contact@exemple.fr)
+      - titre: Hébergeur
+        texte: |
+          [À compléter : nom de l'hébergeur], [À compléter : adresse postale], [À compléter : téléphone].
+      - titre: Sources des données
+        texte: |
+          Les niveaux de risque et les consignes d'accès aux massifs sont publiés par les préfectures sur [risque-prevention-incendie.fr](https://www.risque-prevention-incendie.fr). Seuls ces arrêtés et la carte officielle font foi : vérifiez-les avant toute sortie.
+      - titre: Licence
+        texte: |
+          Le code du site est libre, sous licence WTFPL : vous pouvez en faire ce que vous voulez. Il est disponible sur [GitHub](https://github.com/ctruillet/ne).
+
+          Les éléments repris d'autres projets gardent leur licence : design system SGDF (MIT), icônes Font Awesome Free (CC BY 4.0), polices Raleway, Sarabun et Caveat Brush (SIL Open Font License).
+
+  donnees-personnelles:
+    titre: Données personnelles
+    description: Quelles données le site Prévisions des massifs conserve, pourquoi, combien de temps, et vos droits.
+    introduction: Le site affiche les prévisions sans compte et sans traceur. Les données ci-dessous ne concernent que les personnes connectées et les membres des camps.
+    sections:
+      - titre: Responsable du traitement
+        texte: |
+          [À compléter : nom], joignable à [À compléter : adresse e-mail de contact](mailto:contact@exemple.fr).
+      - titre: Données conservées
+        texte: |
+          - **Compte** (créé à la première connexion) : numéro d'adhérent, nom, e-mail, date de dernière connexion, transmis par l'Intranet SGDF. Le mot de passe est vérifié par l'Intranet et n'est jamais conservé.
+          - **Membres des camps** : e-mail ou numéro d'adhérent, nom et rôle, saisis par les admins du camp.
+          - **Camps** : nom, dates et massifs. Les dates et les membres ne sont visibles que par les membres du camp et le responsable du site.
+          - **Journal des mails** : date, camp et adresses des destinataires de chaque envoi.
+      - titre: Pourquoi
+        texte: |
+          Permettre à chacun de retrouver ses camps et prévenir les membres d'un camp, par mail, des restrictions d'accès aux massifs pendant le camp. Base légale : intérêt légitime (sécurité des personnes en camp).
+      - titre: Durée de conservation
+        texte: |
+          - Comptes : supprimés après 3 ans sans connexion.
+          - Membres : jusqu'à leur retrait du camp ou la suppression du camp.
+          - Journal des mails : 1 an.
+      - titre: Destinataires
+        texte: |
+          Les données ne sont ni vendues ni cédées. Seuls y ont accès le responsable du site, les admins de chaque camp (pour leur camp), l'hébergeur et le service d'envoi des mails, dans la limite de leur mission.
+      - titre: Cookie
+        texte: |
+          Un seul cookie, déposé à la connexion, garde la session ouverte (30 jours au plus). Strictement nécessaire au service, il ne demande pas de consentement. Aucun cookie de mesure d'audience ni de publicité.
+      - titre: Vos droits
+        texte: |
+          Vous pouvez vous retirer vous-même d'un camp depuis « Mes camps ». Pour accéder à vos données, les corriger, les supprimer ou vous opposer à leur traitement, écrivez au responsable du traitement.
+
+          En cas de difficulté, vous pouvez saisir la [CNIL](https://www.cnil.fr/fr/plaintes).

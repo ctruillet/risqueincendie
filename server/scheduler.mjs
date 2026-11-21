@@ -1,5 +1,5 @@
 // Relevé périodique des prévisions du lendemain, suivi des mails aux membres des camps
-import { listCamps } from './db.mjs';
+import { listCamps, purgerAnciennesDonnees } from './db.mjs';
 import { updateHistory, getParisDate, getParisHour } from './history.mjs';
 import { notifierCamps, campActifLe } from './notify.mjs';
 import { UPDATE_INTERVAL_MINUTES, SEASON_START, SEASON_END, START_HOUR } from './config.mjs';
@@ -40,4 +40,7 @@ export async function passage({ force = false } = {}) {
 export function demarrerPlanificateur() {
     setTimeout(passage, 5_000);
     setInterval(passage, UPDATE_INTERVAL_MINUTES * 60_000);
+    // Données trop anciennes : au démarrage puis une fois par jour
+    purgerAnciennesDonnees();
+    setInterval(purgerAnciennesDonnees, 24 * 3600_000);
 }

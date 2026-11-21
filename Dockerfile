@@ -26,6 +26,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY server/ server/
 COPY --from=interface /app/public/ public/
 COPY seed/ seed/
+COPY contenu/ contenu/
 RUN mkdir -p /data && chown node:node /data
 
 USER node

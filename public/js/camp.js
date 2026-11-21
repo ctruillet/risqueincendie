@@ -49,7 +49,7 @@ function genererResume(jours) {
         </div>`).join('');
 
     const barre = liste.map(g =>
-        `<span class="bar-part bar-${g.color}" style="flex-grow:${g.nb}" title="${escapeHtml(g.label)} : ${g.nb} j"></span>`
+        `<span class="bar-part bar-${g.color}" data-nb="${g.nb}" title="${escapeHtml(g.label)} : ${g.nb} j"></span>`
     ).join('');
     const legende = liste.map(g => `
         <li><span class="legend-dot cell-${g.color}"></span>${escapeHtml(g.label)} <strong>${g.nb} j</strong></li>`
@@ -169,6 +169,8 @@ async function init() {
 
     const zoneActive = camp.zones.some(z => z.cle === params.get('zone')) ? params.get('zone') : camp.zones[0].cle;
     container.innerHTML = genererZones(camp.zones, joursParZone, today, zoneActive);
+    // Largeur de chaque part de la barre (propriété CSS posée en JS : pas de style en ligne, interdit par la CSP)
+    for (const part of container.querySelectorAll('.bar-part')) part.style.flexGrow = part.dataset.nb;
 
     // Onglets : clic, flèches gauche/droite ; l'onglet affiché est mémorisé dans l'adresse
     const activerOnglet = (onglet) => {

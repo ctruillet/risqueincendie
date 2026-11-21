@@ -10,6 +10,8 @@ services:
       - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"
     volumes:
       - data:/data
+      # Pied de page et pages obligatoires : modifiables sur le serveur, pris en compte à l'enregistrement
+      - ./contenu:/app/contenu:ro
     restart: unless-stopped
     logging:
       driver: json-file

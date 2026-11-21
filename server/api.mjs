@@ -1,8 +1,8 @@
 // API du site : /api/…
 // Trois niveaux d'accès, après connexion avec les identifiants Intranet :
 //   responsable du site (structure STRUCTURE_RESPONSABLE) : tout, y compris créer et supprimer les camps
-//   admin d'un camp                    : modifie ce camp (dates, massifs, membres) et envoie ses mails
-//   participant d'un camp              : voit ce camp mis en avant sur l'accueil et peut s'en retirer
+//   admin d'un camp       : modifie ce camp (dates, massifs, membres) et envoie ses mails
+//   participant d'un camp : voit ce camp dans « Mes camps » et peut s'en retirer
 import { listCamps, getCamp, saveCamp, deleteCamp, membres, envois } from './db.mjs';
 import { login, logout, currentUser, tropDeTentatives, noterEchec } from './auth.mjs';
 import { readHistory, getParisDate } from './history.mjs';
@@ -17,9 +17,21 @@ import { UPDATE_INTERVAL_MINUTES, SEASON_START, SEASON_END, START_HOUR } from '.
 // Rôle de l'utilisateur dans chaque camp : { campId: 'admin' | 'participant' }
 const rolesDe = user => membres.roles(user);
 
-const campsAdmin = user => user.superAdmin
-    ? listCamps({ avecMembres: true })
-    : listCamps({ avecMembres: true }).filter(c => rolesDe(user)[c.id] === 'admin');
+// Camps visibles dans la page de gestion, avec le rôle de l'utilisateur dans chacun.
+// Un participant ne voit que le nom des admins : les coordonnées des membres sont réservées aux admins.
+function campsVisibles(user) {
+    const roles = rolesDe(user);
+    return listCamps({ avecMembres: true })
+        .filter(c => user.superAdmin || roles[c.id])
+        .map(camp => {
+            const role = user.superAdmin ? 'admin' : roles[camp.id];
+            const membres = role === 'admin' ? camp.membres
+                : camp.membres.filter(m => m.role === 'admin').map(({ role: r, nom }) => ({ role: r, nom }));
+            return { ...camp, role, membre: Boolean(roles[camp.id]), membres };
+        });
+}
+
+const campsAdmin = user => campsVisibles(user).filter(c => c.role === 'admin');
 
 function exigerSuperAdmin(user) {
     if (!user.superAdmin) throw new HttpError(403, 'Réservé au responsable du site');
@@ -31,7 +43,7 @@ function exigerAdmin(user, camp) {
     }
 }
 
-// Admin d'au moins un camp (accès à la page d'administration)
+// Admin d'au moins un camp (journal des mails)
 function exigerUnCamp(user) {
     if (!user.superAdmin && !Object.values(rolesDe(user)).includes('admin')) {
         throw new HttpError(403, "Vous n'êtes admin d'aucun camp");
@@ -39,6 +51,9 @@ function exigerUnCamp(user) {
 }
 
 const ADMIN_REQUIS = 'Le camp doit garder au moins un admin : nommez-en un autre avant';
+
+// Envoi manuel des prévisions : une fois par minute et par camp au plus
+const derniersEnvois = new Map();
 
 // --- Routes sans connexion ---
 
@@ -66,14 +81,9 @@ const profil = user => user && {
 
 async function routeMesCamps(req, res, user, id) {
     const roles = rolesDe(user);
+    // Camps dont on est membre : mis en valeur sur l'accueil
     if (req.method === 'GET' && !id) {
-        const camps = listCamps({ avecMembres: true }).filter(c => roles[c.id]).map(({ membres: liste, ...camp }) => ({
-            ...camp,
-            role: roles[camp.id],
-            // Les coordonnées des autres membres ne sont montrées qu'aux admins du camp
-            ...(roles[camp.id] === 'admin' && { membres: liste })
-        }));
-        return json(req, res, 200, camps);
+        return json(req, res, 200, Object.entries(roles).map(([campId, role]) => ({ id: campId, role })));
     }
     // Se retirer d'un camp
     if (req.method === 'DELETE' && id) {
@@ -88,14 +98,11 @@ async function routeMesCamps(req, res, user, id) {
     throw new HttpError(404, 'Introuvable');
 }
 
-// --- Camps (admins) ---
+// --- Camps (page de gestion) ---
 
 async function routeCamps(req, res, user, id, action) {
     const m = req.method;
-    if (m === 'GET' && !id) {
-        exigerUnCamp(user);
-        return json(req, res, 200, campsAdmin(user));
-    }
+    if (m === 'GET' && !id) return json(req, res, 200, campsVisibles(user));
     if (m === 'POST' && !id) {
         exigerSuperAdmin(user);
         const camp = validerCamp(await lireJson(req));
@@ -123,6 +130,10 @@ async function routeCamps(req, res, user, id, action) {
     }
     // Envoi immédiat de la prévision du lendemain aux membres
     if (m === 'POST' && action === 'envoyer') {
+        if (Date.now() - (derniersEnvois.get(id) ?? 0) < 60_000) {
+            throw new HttpError(429, 'Prévision déjà envoyée il y a moins d\'une minute');
+        }
+        derniersEnvois.set(id, Date.now());
         const date = getParisDate(1);
         const entry = readHistory().find(e => e.date === date) ?? { date };
         const resultat = await envoyerCamp(camp, date, entry);

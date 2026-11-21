@@ -1,5 +1,6 @@
-// Administration : camps (dates, massifs, membres) et mails envoyés.
-// Responsable du site : tous les camps, création et suppression. Admin d'un camp : ses camps seulement.
+// Page de gestion « Mes camps » : camps (dates, massifs, membres) et mails envoyés.
+// Responsable du site : tous les camps, création et suppression. Admin d'un camp : modifie ses camps.
+// Participant : voit ses camps et peut s'en retirer.
 // Les composants sgdf-* viennent du design system SGDF (ui/admin.js, chargé après la connexion).
 const $ = sel => document.querySelector(sel);
 
@@ -19,7 +20,7 @@ async function api(chemin, { method = 'GET', body } = {}) {
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
-        location.replace(`connexion?retour=${encodeURIComponent('/admin' + location.hash)}`);
+        location.replace('connexion?retour=/admin');
         throw new Error('Session expirée, reconnectez-vous.');
     }
     if (!res.ok) throw new Error(data.erreur ?? `Erreur ${res.status}`);
@@ -125,33 +126,38 @@ function listeNoms(membres, role) {
     return noms.length ? noms.join(', ') : 'aucun';
 }
 
+function boutonsCamp(camp) {
+    const admin = camp.role === 'admin';
+    return [
+        admin && '<sgdf-button size="small" variant="primary" data-action="modifier">Modifier</sgdf-button>',
+        admin && `<sgdf-button size="small" appearance="outlined" data-action="envoyer"
+            ${camp.membres.some(m => m.email) ? '' : 'disabled'}>Envoyer la prévision de demain</sgdf-button>`,
+        camp.membre && '<sgdf-button size="small" appearance="outlined" data-action="quitter">Me retirer de ce camp</sgdf-button>',
+        utilisateur.superAdmin && '<sgdf-button size="small" appearance="text" variant="danger" data-action="supprimer">Supprimer le camp</sgdf-button>'
+    ].filter(Boolean).join('');
+}
+
 function afficherCamps() {
     const liste = $('#liste-camps');
-    if (camps.length === 0) {
-        liste.innerHTML = '<p class="vide">Aucun camp pour l\'instant.</p>';
-        return;
-    }
-    liste.innerHTML = camps.map(camp => `
+    liste.innerHTML = camps.length === 0 ? '<p class="vide">Aucun camp pour l\'instant.</p>' : camps.map(camp => `
         <sgdf-card class="camp-item" data-id="${escapeHtml(camp.id)}">
             <h3 slot="header" class="camp-titre">${escapeHtml(camp.titre)}</h3>
             ${etiquetteCamp(camp)}
             <dl class="camp-infos">
-                <dt>Dates</dt><dd>${camp.debut ? `du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'pas de dates : aucun mail envoyé'}</dd>
+                ${camp.membre ? `<dt>Mon rôle</dt><dd>${camp.role === 'admin' ? 'Admin' : 'Participant'}</dd>` : ''}
+                <dt>Dates</dt><dd>${camp.debut ? `du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'pas encore fixées'}</dd>
                 <dt>Massifs</dt><dd>${camp.zones.map(z => escapeHtml(z.label)).join(', ')}</dd>
                 <dt>Admins</dt><dd>${listeNoms(camp.membres, 'admin')}</dd>
-                <dt>Participants</dt><dd>${listeNoms(camp.membres, 'participant')}</dd>
+                ${camp.role === 'admin' ? `<dt>Participants</dt><dd>${listeNoms(camp.membres, 'participant')}</dd>` : ''}
             </dl>
-            <div slot="footer" class="actions">
-                <sgdf-button size="small" variant="primary" data-action="modifier">Modifier</sgdf-button>
-                <sgdf-button size="small" appearance="outlined" data-action="envoyer"
-                    ${camp.membres.some(m => m.email) ? '' : 'disabled'}>Envoyer la prévision de demain</sgdf-button>
-                ${utilisateur.superAdmin ? '<sgdf-button size="small" appearance="text" variant="danger" data-action="supprimer">Supprimer</sgdf-button>' : ''}
-            </div>
+            <div slot="footer" class="actions">${boutonsCamp(camp)}</div>
         </sgdf-card>`).join('');
 }
 
 async function chargerCamps() {
     camps = await api('camps');
+    $('#vue-aucun').hidden = camps.length > 0 || utilisateur.superAdmin;
+    $('#vue-app').hidden = !$('#vue-aucun').hidden;
     afficherCamps();
 }
 
@@ -171,6 +177,20 @@ $('#liste-camps').addEventListener('click', async e => {
         return action(bouton, async () => {
             const r = await api(`${chemin}/envoyer`, { method: 'POST', body: {} });
             notifier(r.erreur ? `Envoyé, avec des erreurs : ${r.erreur}` : 'Mail envoyé aux membres.', { erreur: Boolean(r.erreur) });
+        });
+    }
+    if (bouton.dataset.action === 'quitter') {
+        if (!await confirmer({
+            titre: 'Me retirer de ce camp',
+            texte: camp.role === 'admin'
+                ? `Vous ne serez plus admin de « ${camp.titre} » et ne recevrez plus ses prévisions par mail.`
+                : `Vous ne recevrez plus les prévisions de « ${camp.titre} » par mail. Un admin du camp pourra vous rajouter.`,
+            bouton: 'Me retirer'
+        })) return;
+        return action(bouton, async () => {
+            await api(`mes-camps/${encodeURIComponent(camp.id)}`, { method: 'DELETE' });
+            await chargerCamps();
+            notifier(`Vous n'êtes plus membre de « ${camp.titre} ».`);
         });
     }
     if (bouton.dataset.action === 'supprimer') {
@@ -342,9 +362,6 @@ $('#form-camp').addEventListener('submit', async e => {
         if (campEdite) await api(`camps/${encodeURIComponent(campEdite.id)}`, { method: 'PUT', body });
         else await api('camps', { method: 'POST', body });
         notifier('Camp enregistré.');
-        // Un admin qui s'est retiré du rôle n'a plus accès : retour à l'accueil
-        const { user } = await api('me');
-        if (!user.admin) return location.replace('./');
         await chargerCamps();
         fermerEdition();
     } catch (err) {
@@ -384,27 +401,19 @@ $('#vue-app').addEventListener('sgdf-tab-show', e => {
 
 async function demarrer() {
     const { user } = await api('me');
-    if (!user) return api('mes-camps'); // 401 : renvoie vers la connexion
+    if (!user) return location.replace('connexion?retour=/admin');
     utilisateur = user;
     $('#user-nom').textContent = user.nom || user.identifiant;
     await import('/ui/admin.js');
     await customElements.whenDefined('sgdf-select');
-    if (!user.admin) {
-        $('#vue-aucun').hidden = false;
-        return;
-    }
     if (user.superAdmin) {
         $('#titre-admin').textContent = 'Tous les camps';
         $('#bloc-releve').hidden = false;
         $('#btn-nouveau').hidden = false;
     }
-    $('#vue-app').hidden = false;
+    $('#onglet-envois').hidden = !user.admin;
     massifs = await fetchJson('massifs.json');
     await Promise.all([chargerCamps(), chargerStatus()]);
-    // Lien « Gérer le camp » de l'accueil : admin#camp=<id>
-    const camp = camps.find(c => c.id === new URLSearchParams(location.hash.slice(1)).get('camp'));
-    if (camp) ouvrirEdition(camp);
-    history.replaceState(null, '', location.pathname);
 }
 
 demarrer().catch(e => notifier(e.message, { erreur: true }));

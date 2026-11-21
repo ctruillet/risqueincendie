@@ -12,12 +12,6 @@
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <script>
-    // Mode hors ligne : enregistré après le chargement, pour ne pas ralentir le premier affichage
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => setTimeout(() => navigator.serviceWorker.register('./sw.js'), 2000));
-    }
-    </script>
 </head>
 <body>
 
@@ -40,29 +34,7 @@
         </div>
     </main>
 
-    <dialog id="dialog-quitter" class="dialogue" aria-labelledby="dialog-quitter-titre">
-        <form method="dialog">
-            <h2 id="dialog-quitter-titre">Vous retirer de ce camp ?</h2>
-            <p id="dialog-quitter-texte"></p>
-            <div class="dialogue-actions">
-                <button value="annuler" class="bouton-contour" autofocus>Annuler</button>
-                <button value="ok" class="bouton-plein danger">Me retirer</button>
-            </div>
-        </form>
-    </dialog>
-
-    <footer class="pied">
-        <div class="pied-corps">
-            <div class="pied-haut">
-                <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
-                <div class="footer-texte">
-                    <p id="footer-depts">Données issues des préfectures.</p>
-                    <p><a href="https://www.risque-prevention-incendie.fr" target="_blank" rel="noopener noreferrer">Voir la carte officielle</a></p>
-                </div>
-            </div>
-            <p class="pied-legal">Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France</p>
-        </div>
-    </footer>
+    <!-- pied-de-page -->
 
     <script src="js/common.js" defer></script>
     <script src="js/app.js" defer></script>

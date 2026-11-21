@@ -7,7 +7,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 
 export function texte(value, nom, max, { requis = true } = {}) {
-    const v = String(value ?? '').trim();
+    // Caractères de contrôle (retours à la ligne…) remplacés : rien ne peut s'insérer dans les en-têtes des mails
+    const v = String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
     if (requis && !v) throw new HttpError(400, `${nom} est obligatoire`);
     if (v.length > max) throw new HttpError(400, `${nom} : ${max} caractères maximum`);
     return v;

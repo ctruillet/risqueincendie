@@ -305,7 +305,16 @@ body {
 .pied-haut { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 24px 48px; }
 .pied a { color: inherit; }
 .pied p { margin: 0; }
-.pied-legal { padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.3); font-size: 0.75rem; }
+.pied-liens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    margin: 0;
+    padding: 16px 0 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    list-style: none;
+    font-size: 0.8rem;
+}
 
 /* ---------- Accueil : un camp par carte ---------- */
 
@@ -627,86 +636,18 @@ body {
     .barre:has(.compte) .marque { font-size: 0; gap: 0; }
 }
 
-/* ---------- Mes camps : mise en avant sur l'accueil ---------- */
+/* ---------- Camp dont on est membre : contour mis en valeur sur l'accueil ---------- */
 
 .camp-mien {
     border: 2px solid var(--sgdf-color-text-primary);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--sgdf-color-text-primary) 12%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--sgdf-color-text-primary) 15%, transparent);
 }
 
-.mon-camp {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 12px 14px;
-    border-radius: var(--sgdf-border-radius-medium);
-    background: var(--sgdf-color-info-alert-bg);
-    border: 1px solid var(--sgdf-color-info-alert-border);
-    font-size: 0.92rem;
-}
+/* ---------- Pages de contenu/site.yml (mentions légales, données personnelles…) ---------- */
 
-.mon-camp p { margin: 0; }
-.mon-camp-tete { display: flex; flex-wrap: wrap; gap: 6px; }
-.mon-camp-dates { display: flex; align-items: center; gap: 8px; }
-.mon-camp-dates svg { width: 1em; height: 1em; flex-shrink: 0; }
-.mon-camp-actions { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-
-.etiquette {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 10px;
-    border-radius: var(--sgdf-border-radius-pill);
-    background: var(--sgdf-color-bg-primary);
-    color: var(--sgdf-color-on-default);
-    font-size: 0.75rem;
-    font-weight: var(--sgdf-font-weight-bold);
-}
-
-.etiquette-claire {
-    background: var(--card-bg);
-    color: var(--sgdf-color-text-heading);
-    border: 1px solid var(--sgdf-color-border);
-}
-
-button.lien-action {
-    border: none;
-    background: none;
-    color: var(--sgdf-color-text-primary);
-    font-family: inherit;
-    cursor: pointer;
-}
-
-.lien-action:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 2px; }
-
-/* ---------- Boîte de confirmation (rendu sgdf-dialog, sans JavaScript de composant) ---------- */
-
-.dialogue {
-    width: min(28rem, calc(100vw - 32px));
-    box-sizing: border-box;
-    padding: 1.25rem;
-    border: 1px solid var(--sgdf-color-border);
-    border-radius: var(--sgdf-border-radius-large);
-    background: var(--card-bg);
-    color: var(--text-color);
-}
-
-.dialogue::backdrop { background: rgba(0, 20, 35, 0.55); }
-.dialogue h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--sgdf-color-text-heading); }
-.dialogue p { margin: 0 0 12px; line-height: 1.5; }
-.dialogue-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-
-.bouton-plein, .bouton-contour {
-    height: 2.5rem;
-    padding: 0 1rem;
-    border-radius: var(--sgdf-border-radius-medium);
-    font: inherit;
-    font-weight: var(--sgdf-font-weight-bold);
-    cursor: pointer;
-}
-
-.bouton-contour { border: 1px solid var(--sgdf-color-border); background: transparent; color: var(--text-color); }
-.bouton-contour:hover { background: var(--sgdf-color-bg-neutral-hovered); }
-/* Rouge foncé fixe : texte blanc lisible en thème clair comme sombre */
-.bouton-plein.danger { border: none; background: #a63211; color: #ffffff; }
-.bouton-plein.danger:hover { background: #8a2a0e; }
-.bouton-plein:focus-visible, .bouton-contour:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 2px; }
+.page-texte { gap: 16px; }
+.page-section { line-height: 1.6; gap: 0.5rem; }
+.page-section h2 { margin: 0; font-size: 1.1rem; color: var(--sgdf-color-text-heading); }
+.page-section p, .page-section ul { margin: 0; }
+.page-section ul { padding-left: 1.25rem; }
+.page-section a { overflow-wrap: anywhere; }

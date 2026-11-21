@@ -3,6 +3,7 @@
 //   /camps.json       → camps depuis la base (sans dates ni membres)
 //   /historique.json  → historique des niveaux (dans DATA_DIR)
 //   /connexion        → connexion avec les identifiants Intranet
+//   /<page>           → pages de contenu/site.yml (mentions légales, données personnelles…)
 //   /api/…            → API (server/api.mjs)
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, copyFileSync, statSync, readdirSync } from 'node:fs';
@@ -14,6 +15,7 @@ import { api } from './api.mjs';
 import { demarrerPlanificateur } from './scheduler.mjs';
 import { HttpError, TYPES, envoyerContenu, json, verifierOrigine } from './http.mjs';
 import { getParisDate, fetchDept } from './history.mjs';
+import { piedDePage, page } from './contenu.mjs';
 
 // --- Premier lancement : import des données de seed/ ---
 
@@ -27,10 +29,10 @@ if (!INTRANET.apiUrl) console.log("⚠️ API Intranet non configurée (INTRANET
 
 // --- Fichiers du site ---
 
-const CSP_ADMIN = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
-    + "frame-ancestors 'none'; form-action 'self'; base-uri 'none'";
+// Toutes les pages : rien d'autre que les fichiers du site (ni script ni style en ligne, ni site tiers)
+const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+    + "object-src 'none'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'";
 const ALIAS = { '/': 'index.html', '/admin': 'admin.html', '/connexion': 'connexion.html' };
-const PAGES_PRIVEES = new Set(['admin.html', 'connexion.html']);
 
 // Empreinte d'un fichier du site, recalculée quand il change (mtime)
 const empreintes = new Map();
@@ -65,8 +67,23 @@ function prechargementPolices() {
         .join('\n    ');
 }
 
+// Pied de page (contenu/site.yml) à la place de <!-- pied-de-page -->, liens versionnés, polices préchargées
 function preparerPage(html) {
-    return versionnerLiens(html).replace('<link rel="stylesheet"', `${prechargementPolices()}\n    <link rel="stylesheet"`);
+    return versionnerLiens(html.replace('<!-- pied-de-page -->', piedDePage()))
+        .replace('<link rel="stylesheet"', `${prechargementPolices()}\n    <link rel="stylesheet"`);
+}
+
+function envoyerPage(req, res, html) {
+    envoyerContenu(req, res, 200, preparerPage(html), TYPES['.html'], { 'Content-Security-Policy': CSP });
+}
+
+// Page de contenu/site.yml, dans le gabarit public/page.html
+function pageContenu(req, res, contenu) {
+    const gabarit = readFileSync(join(PUBLIC_DIR, 'page.html'), 'utf8');
+    envoyerPage(req, res, gabarit
+        .replaceAll('{{titre}}', contenu.titre)
+        .replace('{{description}}', contenu.description)
+        .replace('{{contenu}}', contenu.html));
 }
 
 function fichierPublic(req, res, chemin) {
@@ -80,14 +97,15 @@ function fichierPublic(req, res, chemin) {
     // Jamais en dehors de public/, jamais de fichier caché
     if (!fichier.startsWith(PUBLIC_DIR + sep) || /(^|[\\/])\./.test(relatif)) throw new HttpError(404, 'Introuvable');
     const type = TYPES[extname(fichier)];
-    if (!type || !existsSync(fichier) || !statSync(fichier).isFile()) throw new HttpError(404, 'Introuvable');
-    const entetes = PAGES_PRIVEES.has(relatif) ? { 'Content-Security-Policy': CSP_ADMIN } : {};
+    // page.html n'est qu'un gabarit
+    if (!type || relatif === 'page.html' || !existsSync(fichier) || !statSync(fichier).isFile()) throw new HttpError(404, 'Introuvable');
+    if (extname(fichier) === '.html') return envoyerPage(req, res, readFileSync(fichier, 'utf8'));
+    const entetes = {};
     // Adresse avec empreinte (?v=), morceaux JS et polices au nom unique : le contenu ne change jamais
     const versionne = new URL(req.url, 'http://localhost').searchParams.has('v');
     if (versionne || /^ui\/(communs|polices)\//.test(relatif)) entetes['Cache-Control'] = 'public, max-age=31536000, immutable';
     else if (relatif.startsWith('ui/icons/')) entetes['Cache-Control'] = 'public, max-age=604800';
-    const contenu = extname(fichier) === '.html' ? preparerPage(readFileSync(fichier, 'utf8')) : readFileSync(fichier);
-    envoyerContenu(req, res, 200, contenu, type, entetes);
+    envoyerContenu(req, res, 200, readFileSync(fichier), type, entetes);
 }
 
 // --- Prévisions en direct ---
@@ -137,6 +155,8 @@ async function router(req, res, chemin) {
         default: {
             const direct = chemin.match(/^\/previsions\/(\d{1,3})\/(\d{8})\.json$/);
             if (direct) return previsionsEnDirect(req, res, direct[1], direct[2]);
+            const contenu = page(chemin.slice(1));
+            if (contenu) return pageContenu(req, res, contenu);
             return fichierPublic(req, res, chemin);
         }
     }

@@ -34,6 +34,8 @@ export function envoyerContenu(req, res, status, contenu, type, entetes = {}) {
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'same-origin',
         'X-Frame-Options': 'DENY',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+        'Cross-Origin-Opener-Policy': 'same-origin',
         ...entetes
     };
     if (status === 200 && req.headers['if-none-match'] === etag) {

@@ -1,3 +1,8 @@
+// Service worker (mode hors ligne) : enregistré après le chargement, pour ne pas ralentir le premier affichage
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => setTimeout(() => navigator.serviceWorker.register('./sw.js'), 2000));
+}
+
 const JOURS_HISTORIQUE = 7;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,24 +35,25 @@ const ICONE_CALENDRIER = '<svg viewBox="0 0 640 640" aria-hidden="true"><path fi
 
 // --- Compte : bouton « Se connecter », camps de la personne connectée ---
 
-// Personne connectée et ses camps ({ id, titre, debut, fin, role }), ou rien
+// Personne connectée et les identifiants de ses camps, ou rien
 async function chargerCompte() {
     try {
         const { user } = await fetchJson('api/me');
-        if (!user) return { user: null, mesCamps: [] };
-        return { user, mesCamps: await fetchJson('api/mes-camps') };
+        if (!user) return { user: null, mesCamps: new Set() };
+        const camps = await fetchJson('api/mes-camps');
+        return { user, mesCamps: new Set(camps.map(c => c.id)) };
     } catch {
         // Hors ligne ou serveur indisponible : la page reste utilisable sans compte
-        return { user: null, mesCamps: [] };
+        return { user: null, mesCamps: new Set() };
     }
 }
 
+// Connecté : « Mes camps » (page de gestion) et « Déconnexion » à la place de « Se connecter »
 function afficherCompte(user) {
     if (!user) return;
-    const compte = document.getElementById('compte');
-    compte.innerHTML = `
+    document.getElementById('compte').innerHTML = `
         <span class="compte-nom">${escapeHtml(user.nom || user.identifiant)}</span>
-        ${user.admin ? '<a href="admin" class="bouton-barre principal">Gérer les camps</a>' : ''}
+        <a href="admin" class="bouton-barre principal">Mes camps</a>
         <button type="button" id="btn-deconnexion" class="bouton-barre">Déconnexion</button>`;
     document.getElementById('btn-deconnexion').addEventListener('click', async () => {
         await fetch('api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
@@ -55,61 +61,7 @@ function afficherCompte(user) {
     });
 }
 
-const dateLongue = iso => formatDate(iso, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-// Bandeau « Votre camp » en tête de la carte : rôle, dates (connues des seuls membres), actions
-function genererMonCamp(monCamp) {
-    const aujourdhui = getIsoDate(0);
-    const enCours = monCamp.debut && monCamp.debut <= aujourdhui && aujourdhui <= monCamp.fin;
-    const dates = monCamp.debut
-        ? `Du ${dateLongue(monCamp.debut)} au ${dateLongue(monCamp.fin)}`
-        : 'Dates pas encore fixées';
-    const id = encodeURIComponent(monCamp.id);
-    return `
-        <div class="mon-camp">
-            <p class="mon-camp-tete">
-                <span class="etiquette">Votre camp</span>
-                <span class="etiquette etiquette-claire">${monCamp.role === 'admin' ? 'Admin' : 'Participant'}</span>
-                ${enCours ? '<span class="etiquette etiquette-claire">En cours</span>' : ''}
-            </p>
-            <p class="mon-camp-dates">${ICONE_CALENDRIER}${dates}</p>
-            <div class="mon-camp-actions">
-                ${monCamp.role === 'admin' ? `<a class="lien-action" href="admin#camp=${id}">Gérer le camp</a>` : ''}
-                <button type="button" class="lien-action" data-quitter="${escapeHtml(monCamp.id)}">Me retirer de ce camp</button>
-            </div>
-        </div>`;
-}
-
-// Se retirer d'un camp, après confirmation
-function activerQuitter(container, mesCamps, statusLine) {
-    const dialog = document.getElementById('dialog-quitter');
-    container.addEventListener('click', e => {
-        const bouton = e.target.closest('[data-quitter]');
-        if (!bouton) return;
-        const camp = mesCamps.find(c => c.id === bouton.dataset.quitter);
-        document.getElementById('dialog-quitter-texte').textContent = camp.role === 'admin'
-            ? `Vous ne serez plus admin de « ${camp.titre} » et ne recevrez plus ses prévisions par mail.`
-            : `Vous ne recevrez plus les prévisions de « ${camp.titre} » par mail. Un admin du camp pourra vous rajouter.`;
-        dialog.returnValue = '';
-        dialog.showModal();
-        dialog.addEventListener('close', async () => {
-            if (dialog.returnValue !== 'ok') return bouton.focus();
-            try {
-                const res = await fetch(`api/mes-camps/${encodeURIComponent(camp.id)}`, { method: 'DELETE' });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(data.erreur ?? `Erreur ${res.status}`);
-                const carte = bouton.closest('.camp');
-                carte.classList.remove('camp-mien');
-                carte.querySelector('.mon-camp').remove();
-                statusLine.textContent = `Vous n'êtes plus membre de « ${camp.titre} ».`;
-            } catch (err) {
-                statusLine.textContent = `Impossible de vous retirer du camp : ${err.message}`;
-            }
-        }, { once: true });
-    });
-}
-
-function genererStructureCamp(camp, labels, monCamp = null) {
+function genererStructureCamp(camp, labels, estMien = false) {
     const rowsHtml = camp.zones.map(zone => {
         const cle = escapeHtml(zone.cle);
         return `
@@ -136,9 +88,8 @@ function genererStructureCamp(camp, labels, monCamp = null) {
 
     const lienEte = `camp.html?camp=${encodeURIComponent(camp.id)}`;
     return `
-        <section class="carte camp${monCamp ? ' camp-mien' : ''}">
-            <h2 class="carte-titre"><a href="${lienEte}">${escapeHtml(camp.titre)}</a></h2>
-            ${monCamp ? genererMonCamp(monCamp) : ''}
+        <section class="carte camp${estMien ? ' camp-mien' : ''}">
+            <h2 class="carte-titre"><a href="${lienEte}">${escapeHtml(camp.titre)}</a>${estMien ? '<span class="visually-hidden"> (votre camp)</span>' : ''}</h2>
             <div class="rows-container">${rowsHtml}</div>
             <a class="lien-action" href="${lienEte}">${ICONE_CALENDRIER}Historique de l'été</a>
         </section>`;
@@ -196,15 +147,6 @@ function genererDetail({ zone, labels, statusToday, statusTomorrow, sources, reg
         <ul class="trend">${points}</ul>`;
 }
 
-function afficherDepartements(zones) {
-    const depts = [...new Set(zones.map(z => z.dept))].sort();
-    const liste = depts.length > 1
-        ? `${depts.slice(0, -1).join(', ')} et ${depts.at(-1)}`
-        : depts.join('');
-    document.getElementById('footer-depts').textContent =
-        `Données issues des préfectures ${depts.length > 1 ? 'des départements' : 'du département'} ${liste}.`;
-}
-
 async function init() {
     const container = document.getElementById('dashboard-container');
     const statusLine = document.getElementById('status-line');
@@ -242,14 +184,12 @@ async function init() {
         return;
     }
     // Les camps de la personne connectée passent en premier
-    const mesCamps = new Map(compte.mesCamps.map(c => [c.id, c]));
+    const { mesCamps } = compte;
     camps = [...camps.filter(c => mesCamps.has(c.id)), ...camps.filter(c => !mesCamps.has(c.id))];
 
     const zones = camps.flatMap(c => c.zones);
     const historyByDate = new Map(history.map(item => [item.date, item]));
-    afficherDepartements(zones);
-    container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels, mesCamps.get(camp.id))).join('');
-    activerQuitter(container, compte.mesCamps, statusLine);
+    container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels, mesCamps.has(camp.id))).join('');
 
     // Statuts courants par clé de zone, initialisés depuis l'historique
     const statuts = {

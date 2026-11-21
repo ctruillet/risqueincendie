@@ -30,6 +30,7 @@ services:
       MAIL_FROM: "Prévisions des Massifs <notifications@example.org>"
     volumes:
       - data:/data
+      - ./contenu:/app/contenu:ro
     depends_on:
       keycloak:
         condition: service_healthy
