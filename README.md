@@ -229,7 +229,6 @@ Les messages de commit suivent la convention [Conventional Commits](https://www.
 ## Contributeurs
 
 - **Clément Truillet** ([@ctruillet](https://github.com/ctruillet)) : auteur et mainteneur.
-- **Claude** (assistant IA d'Anthropic) : aide au développement, co-auteur de commits.
 - **github-actions[bot]** : relevé automatique de l'historique des prévisions (ancienne version hébergée sur GitHub Pages).
 
 Merci aux auteurs de [sgdf-ui](https://gitlab.com/sgdf/projets-benevoles/sgdf-ui), du [template PNB](https://gitlab.com/sgdf/projets-benevoles/pnb-template) et d'[api-intranet-java](https://gitlab.com/sgdf/projets-benevoles/api-intranet-java).
