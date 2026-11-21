@@ -1,7 +1,7 @@
 // Mails envoyés aux membres des camps : niveaux du lendemain pendant les dates du camp
 import nodemailer from 'nodemailer';
 import { envois } from './db.mjs';
-import { getParisHour } from './history.mjs';
+import { getParisHour } from './dates.mjs';
 import { PUBLIC_URL, NOTIFY_DEADLINE_HOUR, SMTP, regles } from './config.mjs';
 
 const COULEURS = { 1: '#15803d', 2: '#a16207', 3: '#c2410c', 4: '#b91c1c', 5: '#0f172a', unknown: '#64748b' };

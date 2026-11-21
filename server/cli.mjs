@@ -1,7 +1,7 @@
 // Commandes d'exploitation (les comptes sont créés à la première connexion Intranet).
 //   node server/cli.mjs list-users     (comptes déjà connectés)
-//   node server/cli.mjs backup         (copie la base et l'historique dans /data/backups)
-import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
+//   node server/cli.mjs backup         (copie la base, historique compris, dans /data/backups)
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { users, backupTo } from './db.mjs';
 import { DATA_DIR } from './config.mjs';
@@ -20,10 +20,7 @@ switch (commande) {
         const horodatage = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
         const fichier = join(dossier, `ne-${horodatage}.db`);
         backupTo(fichier);
-        if (existsSync(join(DATA_DIR, 'historique.json'))) {
-            copyFileSync(join(DATA_DIR, 'historique.json'), join(dossier, `historique-${horodatage}.json`));
-        }
-        console.log(`✅ Sauvegarde dans ${dossier} (ne-${horodatage}.db et historique-${horodatage}.json)`);
+        console.log(`✅ Sauvegarde : ${fichier}`);
         break;
     }
     default:

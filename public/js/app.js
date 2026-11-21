@@ -272,7 +272,8 @@ async function init() {
         [camps, regles, history, compte] = await Promise.all([
             fetchJson('./camps.json'),
             fetchJson('./regles.json'),
-            fetchJson('./historique.json'),
+            // Seulement les jours affichés : tendance des jours précédents, jour choisi et lendemain
+            fetchJson(`./historique.json?du=${getIsoDate(-JOURS_HISTORIQUE, todayKey)}&au=${tomorrowKey}`),
             chargerCompte()
         ]);
     } catch (e) {

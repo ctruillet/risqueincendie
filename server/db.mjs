@@ -1,10 +1,10 @@
-// Base SQLite (module node:sqlite intégré à Node 24) : camps, membres des camps, comptes (connexion
-// par l'Intranet), sessions et journal des mails envoyés.
+// Base SQLite (module node:sqlite intégré à Node 24) : camps et leurs massifs, historique des niveaux,
+// membres des camps, comptes (connexion par l'Intranet), sessions et journal des mails envoyés.
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR, SEASON_END } from './config.mjs';
-import { getParisDate } from './history.mjs';
+import { getParisDate } from './dates.mjs';
 
 mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(join(DATA_DIR, 'ne.db'));
@@ -13,6 +13,28 @@ const db = new DatabaseSync(join(DATA_DIR, 'ne.db'));
 if (db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'password_hash'").get()) {
     db.exec('DROP TABLE IF EXISTS sessions; DROP TABLE users;');
     console.log("🔑 Anciens comptes à mot de passe supprimés : la connexion passe par l'Intranet.");
+}
+
+// Un massif est identifié par « département-massif » (ex. 13-133), dans l'historique comme sur le site
+export const cleMassif = (dept, idMassif) => `${dept}-${idMassif}`;
+
+// Migration : les massifs avaient une clé choisie à la main (table zones, ex. « sainteBaume13 »).
+// Les massifs des camps sont repris ; la correspondance sert à importer l'ancien historique.json.
+// (les clés de la toute première version, publiée sur GitHub Pages, sont connues d'avance)
+const anciennesCles = new Map(Object.entries({
+    calanques: '13-133', sainteBaume13: '13-1322', sainteBaume83: '83-832', garrigues: '34-344'
+}));
+if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'zones'").get()) {
+    for (const z of db.prepare('SELECT cle, dept, id_massif FROM zones').all()) anciennesCles.set(z.cle, cleMassif(z.dept, z.id_massif));
+    db.exec(`
+        PRAGMA foreign_keys = OFF;
+        BEGIN;
+        CREATE TABLE camp_massifs_ancien AS
+            SELECT cz.camp_id, z.dept, z.id_massif, cz.label, cz.position FROM camp_zones cz JOIN zones z ON z.cle = cz.cle;
+        DROP TABLE camp_zones;
+        DROP TABLE zones;
+        COMMIT;
+    `);
 }
 
 db.exec(`
@@ -27,21 +49,24 @@ db.exec(`
         fin      TEXT               -- AAAA-MM-JJ, inclus
     );
 
-    -- Une zone = un massif d'un département. La clé est celle utilisée dans historique.json.
-    -- Les zones ne sont jamais supprimées : un nouveau camp sur le même massif retrouve son historique.
-    CREATE TABLE IF NOT EXISTS zones (
-        cle       TEXT PRIMARY KEY,
+    -- Massifs suivis par un camp, dans l'ordre d'affichage
+    CREATE TABLE IF NOT EXISTS camp_massifs (
+        camp_id   TEXT NOT NULL REFERENCES camps(id) ON DELETE CASCADE ON UPDATE CASCADE,
         dept      TEXT NOT NULL,
         id_massif TEXT NOT NULL,
-        UNIQUE (dept, id_massif)
+        label     TEXT NOT NULL,
+        position  INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (camp_id, dept, id_massif)
     );
 
-    CREATE TABLE IF NOT EXISTS camp_zones (
-        camp_id  TEXT NOT NULL REFERENCES camps(id) ON DELETE CASCADE ON UPDATE CASCADE,
-        cle      TEXT NOT NULL REFERENCES zones(cle),
-        label    TEXT NOT NULL,
-        position INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (camp_id, cle)
+    -- Historique : niveau publié par la préfecture pour un massif et un jour (statut = clé de regles.json).
+    -- Indépendant des camps : un nouveau camp sur le même massif retrouve son historique.
+    CREATE TABLE IF NOT EXISTS releves (
+        date      TEXT NOT NULL,        -- AAAA-MM-JJ
+        dept      TEXT NOT NULL,
+        id_massif TEXT NOT NULL,
+        statut    TEXT NOT NULL,
+        PRIMARY KEY (date, dept, id_massif)
     );
 
     -- Membres d'un camp : ajoutés par un admin du camp (e-mail et/ou identifiant Intranet) ou abonnés
@@ -107,6 +132,14 @@ export function finSaison(aujourdhui = getParisDate(0)) {
 // Fin d'abonnement d'un participant : la date demandée, au plus tard la fin de l'été
 const finAbonnement = jusquAu => (jusquAu && jusquAu < finSaison() ? jusquAu : finSaison());
 
+if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'camp_massifs_ancien'").get()) {
+    db.exec(`
+        INSERT OR IGNORE INTO camp_massifs SELECT * FROM camp_massifs_ancien;
+        DROP TABLE camp_massifs_ancien;
+    `);
+    console.log('🗺️ Massifs des camps repris (clé département-massif).');
+}
+
 // Copie cohérente de la base, même pendant que le serveur tourne
 export function backupTo(path) {
     db.prepare('VACUUM INTO ?').run(path);
@@ -135,26 +168,12 @@ function transaction(fn) {
     }
 }
 
-// --- Zones ---
-
-// Retourne la clé d'historique du massif, en la créant au besoin
-function cleZone(dept, idMassif) {
-    const existante = db.prepare('SELECT cle FROM zones WHERE dept = ? AND id_massif = ?').get(dept, idMassif);
-    if (existante) return existante.cle;
-    const cle = `m${dept}_${idMassif}`;
-    db.prepare('INSERT INTO zones (cle, dept, id_massif) VALUES (?, ?, ?)').run(cle, dept, idMassif);
-    return cle;
-}
-
 // --- Camps ---
 
 export function listCamps({ avecMembres = false } = {}) {
     // Camps datés dans l'ordre chronologique, puis les autres par nom
     const camps = db.prepare('SELECT id, titre, debut, fin FROM camps ORDER BY debut IS NULL, debut, titre').all();
-    const zones = db.prepare(`
-        SELECT cz.camp_id, cz.cle, cz.label, z.dept, z.id_massif
-        FROM camp_zones cz JOIN zones z ON z.cle = cz.cle
-        ORDER BY cz.position`).all();
+    const zones = db.prepare('SELECT camp_id, dept, id_massif, label FROM camp_massifs ORDER BY position').all();
     const membres = avecMembres
         ? db.prepare(`SELECT id, camp_id, role, nom, email, identifiant, jusqu_au FROM membres
                       ORDER BY role = 'admin' DESC, id`).all()
@@ -162,7 +181,7 @@ export function listCamps({ avecMembres = false } = {}) {
     return camps.map(camp => ({
         ...camp,
         zones: zones.filter(z => z.camp_id === camp.id)
-            .map(({ cle, label, dept, id_massif }) => ({ cle, label, dept, id_massif })),
+            .map(({ dept, id_massif, label }) => ({ cle: cleMassif(dept, id_massif), label, dept, id_massif })),
         ...(avecMembres && {
             membres: membres.filter(m => m.camp_id === camp.id)
                 .map(({ camp_id, ...m }) => m)
@@ -185,11 +204,10 @@ export function saveCamp(camp) {
             db.prepare('INSERT INTO camps (id, titre, debut, fin) VALUES (?, ?, ?, ?)')
                 .run(camp.id, camp.titre, camp.debut, camp.fin);
         }
-        db.prepare('DELETE FROM camp_zones WHERE camp_id = ?').run(camp.id);
+        db.prepare('DELETE FROM camp_massifs WHERE camp_id = ?').run(camp.id);
         camp.zones.forEach((zone, i) => {
-            const cle = zone.cle ?? cleZone(zone.dept, zone.id_massif);
-            db.prepare('INSERT OR IGNORE INTO camp_zones (camp_id, cle, label, position) VALUES (?, ?, ?, ?)')
-                .run(camp.id, cle, zone.label, i);
+            db.prepare('INSERT OR IGNORE INTO camp_massifs (camp_id, dept, id_massif, label, position) VALUES (?, ?, ?, ?, ?)')
+                .run(camp.id, zone.dept, zone.id_massif, zone.label, i);
         });
         db.prepare('DELETE FROM membres WHERE camp_id = ?').run(camp.id);
         for (const m of camp.membres ?? []) {
@@ -204,26 +222,64 @@ export function deleteCamp(id) {
     return db.prepare('DELETE FROM camps WHERE id = ?').run(id).changes > 0;
 }
 
-// Premier lancement : reprend les camps de camps.json (et leurs clés d'historique)
+// Premier lancement : camps de seed/camps.json
 export function seedCamps(campsJsonPath) {
     const { n } = db.prepare('SELECT COUNT(*) AS n FROM camps').get();
     if (n > 0 || !existsSync(campsJsonPath)) return;
     const camps = JSON.parse(readFileSync(campsJsonPath, 'utf8'));
+    for (const camp of camps) saveCamp({ debut: null, fin: null, ...camp });
+    console.log(`📥 ${camps.length} camp(s) importé(s) depuis ${campsJsonPath}.`);
+}
+
+// --- Historique des niveaux ---
+
+// Lignes { date, dept, id_massif, statut } → [{ date, '13-133': statut, … }] (format de /historique.json)
+function parJour(lignes) {
+    const jours = new Map();
+    for (const l of lignes) {
+        if (!jours.has(l.date)) jours.set(l.date, { date: l.date });
+        jours.get(l.date)[cleMassif(l.dept, l.id_massif)] = l.statut;
+    }
+    return [...jours.values()];
+}
+
+export const releves = {
+    vide: () => !db.prepare('SELECT 1 FROM releves LIMIT 1').get(),
+    enregistrer: (date, dept, idMassif, statut) => db.prepare(`
+        INSERT INTO releves (date, dept, id_massif, statut) VALUES (?, ?, ?, ?)
+        ON CONFLICT (date, dept, id_massif) DO UPDATE SET statut = excluded.statut`).run(date, dept, idMassif, statut),
+    // Niveaux d'un jour : { date, '13-133': statut, … }
+    jour: date => parJour(db.prepare('SELECT * FROM releves WHERE date = ?').all(date))[0] ?? { date },
+    // Jours entre du et au (inclus), dans l'ordre
+    periode: (du = '0000-00-00', au = '9999-99-99') => parJour(db.prepare(
+        'SELECT * FROM releves WHERE date BETWEEN ? AND ? ORDER BY date').all(du, au)),
+    // Années pour lesquelles l'un de ces massifs a un historique
+    annees: zones => db.prepare(`
+        SELECT DISTINCT substr(r.date, 1, 4) AS annee
+        FROM releves r JOIN json_each(?) z ON r.dept = z.value ->> 'dept' AND r.id_massif = z.value ->> 'id_massif'
+        ORDER BY annee DESC`).all(JSON.stringify(zones)).map(r => r.annee)
+};
+
+// Reprise d'un historique.json ([{ date, clé: statut }]) dans la base. Une valeur déjà en base est gardée.
+// Les clés sont « département-massif », ou une ancienne clé de la table zones.
+export function importerHistorique(fichier) {
+    if (!existsSync(fichier)) return;
+    let lignes = 0;
+    const ignorees = new Set();
     transaction(() => {
-        for (const camp of camps) {
-            for (const z of camp.zones) {
-                db.prepare('INSERT OR IGNORE INTO zones (cle, dept, id_massif) VALUES (?, ?, ?)')
-                    .run(z.cle, z.dept, z.id_massif);
+        for (const jour of JSON.parse(readFileSync(fichier, 'utf8'))) {
+            for (const [cle, statut] of Object.entries(jour)) {
+                if (cle === 'date' || statut == null || statut === 'unknown') continue;
+                const massif = anciennesCles.get(cle) ?? cle;
+                const m = massif.match(/^(\w+)-(\w+)$/);
+                if (!m) { ignorees.add(cle); continue; }
+                lignes += db.prepare('INSERT OR IGNORE INTO releves (date, dept, id_massif, statut) VALUES (?, ?, ?, ?)')
+                    .run(jour.date, m[1], m[2], String(statut)).changes;
             }
-            db.prepare('INSERT INTO camps (id, titre, debut, fin) VALUES (?, ?, ?, ?)')
-                .run(camp.id, camp.titre, camp.debut ?? null, camp.fin ?? null);
-            camp.zones.forEach((z, i) => {
-                db.prepare('INSERT INTO camp_zones (camp_id, cle, label, position) VALUES (?, ?, ?, ?)')
-                    .run(camp.id, z.cle, z.label, i);
-            });
         }
     });
-    console.log(`📥 ${camps.length} camp(s) importé(s) depuis camps.json.`);
+    console.log(`📥 Historique repris de ${fichier} : ${lignes} niveau(x).${ignorees.size ? ` Clés inconnues ignorées : ${[...ignorees].join(', ')}.` : ''}`);
+    return lignes;
 }
 
 // --- Comptes et sessions ---

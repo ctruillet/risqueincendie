@@ -1,4 +1,4 @@
-const CACHE_NAME = 'risqueincendie-v20';
+const CACHE_NAME = 'risqueincendie-v21';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,6 @@ const ASSETS = [
   './js/camp.js',
   './camps.json',
   './regles.json',
-  './historique.json',
   './manifest.json',
   './icon.svg',
   './logo.svg',

@@ -1,5 +1,5 @@
 // Page « été » d'un camp : chiffres clés, répartition et calendrier du
-// 1er juin au 30 septembre, pour chaque zone. Données : historique.json uniquement.
+// 1er juin au 30 septembre, pour chaque zone. Données : historique.json de l'été choisi.
 // Adresse : camp.html?camp=<id du camp>&annee=<AAAA, optionnel>&zone=<clé, optionnel>
 
 const SAISON = { debut: '06-01', fin: '09-30' };
@@ -121,12 +121,15 @@ async function init() {
     const container = document.getElementById('camp-container');
     const params = new URLSearchParams(window.location.search);
 
+    const today = getIsoDate(0);
+    const anneeDemandee = /^\d{4}$/.test(params.get('annee') ?? '') ? params.get('annee') : today.slice(0, 4);
+
     let camps, regles, history;
     try {
         [camps, regles, history] = await Promise.all([
             fetchJson('./camps.json'),
             fetchJson('./regles.json'),
-            fetchJson('./historique.json')
+            fetchJson(`./historique.json?du=${anneeDemandee}-${SAISON.debut}&au=${anneeDemandee}-${SAISON.fin}`)
         ]);
     } catch (e) {
         console.error("Erreur d'initialisation :", e);
@@ -140,12 +143,11 @@ async function init() {
         return;
     }
 
-    const today = getIsoDate(0);
     const historyByDate = new Map(history.map(item => [item.date, item]));
 
-    // Années disponibles : celles qui ont des données, plus l'année en cours
-    const annees = [...new Set([...history.map(i => i.date.slice(0, 4)), today.slice(0, 4)])].sort().reverse();
-    const annee = annees.includes(params.get('annee')) ? params.get('annee') : today.slice(0, 4);
+    // Années disponibles : celles où le camp a un historique, plus l'année en cours
+    const annees = [...new Set([...(camp.annees ?? []), today.slice(0, 4)])].sort().reverse();
+    const annee = annees.includes(anneeDemandee) ? anneeDemandee : today.slice(0, 4);
 
     const nomCamp = camp.titre.replace(/^\W+/u, '').trim();
     document.title = `${nomCamp} – Été ${annee}`;

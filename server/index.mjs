@@ -1,29 +1,33 @@
 // Point d'entrée : initialise les données, lance le relevé périodique et sert le site
 //   /                 → public/ (site et admin)
 //   /camps.json       → camps depuis la base (sans dates ni membres)
-//   /historique.json  → historique des niveaux (dans DATA_DIR)
+//   /historique.json  → historique des niveaux, ?du=AAAA-MM-JJ&au=AAAA-MM-JJ pour une période
 //   /connexion        → connexion avec les identifiants Intranet
 //   /<page>           → pages de contenu/site.yml (mentions légales, données personnelles…)
 //   /api/…            → API (server/api.mjs)
 import { createServer } from 'node:http';
-import { readFileSync, existsSync, copyFileSync, statSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, readdirSync, renameSync } from 'node:fs';
 import { join, extname, normalize, sep } from 'node:path';
 import { createHash } from 'node:crypto';
 import { PORT, PUBLIC_DIR, SEED_DIR, DATA_DIR, HISTORY_PATH, massifs, INTRANET, intranetConfigure } from './config.mjs';
-import { listCamps, seedCamps } from './db.mjs';
+import { listCamps, seedCamps, importerHistorique, releves } from './db.mjs';
 import { api } from './api.mjs';
 import { demarrerPlanificateur } from './scheduler.mjs';
 import { HttpError, TYPES, envoyerContenu, json, verifierOrigine } from './http.mjs';
-import { getParisDate, fetchDept } from './history.mjs';
+import { fetchDept } from './history.mjs';
+import { getParisDate } from './dates.mjs';
 import { piedDePage, page } from './contenu.mjs';
 
 // --- Premier lancement : import des données de seed/ ---
 
-if (!existsSync(HISTORY_PATH) && existsSync(join(SEED_DIR, 'historique.json'))) {
-    copyFileSync(join(SEED_DIR, 'historique.json'), HISTORY_PATH);
-    console.log('📥 historique.json initialisé depuis seed/.');
-}
 seedCamps(join(SEED_DIR, 'camps.json'));
+// L'historique est dans la base : un ancien historique.json est repris puis mis de côté
+if (existsSync(HISTORY_PATH)) {
+    importerHistorique(HISTORY_PATH);
+    renameSync(HISTORY_PATH, `${HISTORY_PATH}.importe`);
+} else if (releves.vide()) {
+    importerHistorique(join(SEED_DIR, 'historique.json'));
+}
 if (!intranetConfigure) console.log('⚠️ Connexion Intranet non configurée : renseigner INTRANET_URL, INTRANET_REALM et INTRANET_CLIENT_ID.');
 if (!INTRANET.apiUrl) console.log("⚠️ API Intranet non configurée (INTRANET_API_URL) : personne ne sera reconnu comme responsable du site.");
 
@@ -145,13 +149,17 @@ async function router(req, res, chemin) {
         case '/camps.json': {
             // Ni dates ni contacts : on ne publie pas où et quand se trouvent les groupes
             const aujourdhui = getParisDate(0);
+            // annees : étés pour lesquels le camp a un historique (page « été »)
             const camps = listCamps().map(({ id, titre, fin, zones }) => ({
-                id, titre, zones, ...(fin && fin < aujourdhui && { termine: true })
+                id, titre, zones, annees: releves.annees(zones), ...(fin && fin < aujourdhui && { termine: true })
             }));
             return json(req, res, 200, camps, { 'Cache-Control': 'no-cache' });
         }
-        case '/historique.json':
-            return envoyerContenu(req, res, 200, existsSync(HISTORY_PATH) ? readFileSync(HISTORY_PATH) : '[]', TYPES['.json']);
+        case '/historique.json': {
+            const params = new URL(req.url, 'http://x').searchParams;
+            const date = nom => (/^\d{4}-\d{2}-\d{2}$/.test(params.get(nom) ?? '') ? params.get(nom) : undefined);
+            return json(req, res, 200, releves.periode(date('du'), date('au')), { 'Cache-Control': 'no-cache' });
+        }
         default: {
             const direct = chemin.match(/^\/previsions\/(\d{1,3})\/(\d{8})\.json$/);
             if (direct) return previsionsEnDirect(req, res, direct[1], direct[2]);

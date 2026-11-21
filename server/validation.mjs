@@ -2,7 +2,7 @@
 import { HttpError } from './http.mjs';
 import { listCamps } from './db.mjs';
 import { regles, massifs } from './config.mjs';
-import { getParisDate } from './history.mjs';
+import { getParisDate } from './dates.mjs';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;

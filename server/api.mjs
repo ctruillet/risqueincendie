@@ -4,9 +4,9 @@
 //   admin d'un camp       : modifie ce camp (dates, massifs, membres) et envoie ses mails
 //   participant d'un camp : voit ce camp dans « Mes camps » et peut s'en retirer
 //   tout compte           : s'abonne à un camp comme participant, jusqu'à une date ou jusqu'à la fin de l'été
-import { listCamps, getCamp, saveCamp, deleteCamp, membres, envois, finSaison } from './db.mjs';
+import { listCamps, getCamp, saveCamp, deleteCamp, membres, envois, releves, finSaison } from './db.mjs';
 import { login, logout, currentUser, tropDeTentatives, noterEchec } from './auth.mjs';
-import { readHistory, getParisDate } from './history.mjs';
+import { getParisDate } from './dates.mjs';
 import { envoyerCamp, envoyerTest, smtpConfigure } from './notify.mjs';
 import { passage, etat } from './scheduler.mjs';
 import { HttpError, json, lireJson, ipClient } from './http.mjs';
@@ -145,7 +145,7 @@ async function routeCamps(req, res, user, id, action) {
         }
         derniersEnvois.set(id, Date.now());
         const date = getParisDate(1);
-        const entry = readHistory().find(e => e.date === date) ?? { date };
+        const entry = releves.jour(date);
         const resultat = await envoyerCamp(camp, date, entry);
         if (!resultat.ok) throw new HttpError(502, resultat.erreur);
         return json(req, res, 200, { ok: true, erreur: resultat.erreur });

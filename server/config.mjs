@@ -12,6 +12,7 @@ export const SEED_DIR = env.SEED_DIR ?? join(racine, 'seed');
 // Pied de page et pages obligatoires (mentions légales…), modifiables sans toucher au code
 export const CONTENU_FICHIER = env.CONTENU_FICHIER ?? join(racine, 'contenu', 'site.yml');
 export const DATA_DIR = env.DATA_DIR ?? join(racine, 'data');
+// Ancien historique (fichier) : repris dans la base au premier démarrage, puis renommé
 export const HISTORY_PATH = join(DATA_DIR, 'historique.json');
 
 // Relevé des prévisions

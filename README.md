@@ -90,7 +90,7 @@ cp .env.example .env              # compléter PUBLIC_URL, PORT, INTRANET_… et
 docker compose up -d --build
 ```
 
-Le site écoute sur `127.0.0.1:<PORT>`. Il doit être placé derrière un reverse proxy HTTPS, par exemple avec [`docker/nginx-site.conf`](docker/nginx-site.conf) : le cookie de connexion n'est envoyé qu'en HTTPS. Les données (base SQLite et historique) sont dans le volume Docker `data`.
+Le site écoute sur `127.0.0.1:<PORT>`. Il doit être placé derrière un reverse proxy HTTPS, par exemple avec [`docker/nginx-site.conf`](docker/nginx-site.conf) : le cookie de connexion n'est envoyé qu'en HTTPS. Toutes les données (base SQLite, historique compris) sont dans le volume Docker `data`.
 
 ### Variables d'environnement (`.env`)
 
@@ -116,6 +116,8 @@ docker compose cp risqueincendie:/data/backups ./backups                    # r�
 ```
 
 Lors du passage depuis une version avec comptes à mot de passe, ces comptes sont supprimés. Les contacts des camps deviennent des participants et continuent à recevoir les mails.
+
+L'historique, autrefois dans `/data/historique.json`, est repris dans la base au premier démarrage. Le fichier est ensuite renommé `historique.json.importe` : il peut être supprimé une fois la reprise vérifiée.
 
 ### Mails avec Proton Mail
 
@@ -159,10 +161,11 @@ server/                 Serveur Node 24, sans framework
   api.mjs               API (/api/…) et droits de chacun
   intranet.mjs          Connexion et fiche adhérent auprès de l'Intranet SGDF
   auth.mjs              Sessions et limitation des tentatives de connexion
-  db.mjs                Base SQLite : camps, membres, comptes, sessions, journal des mails
+  db.mjs                Base SQLite : camps, historique, membres, comptes, sessions, journal des mails
   validation.mjs        Contrôle des données saisies
   scheduler.mjs         Relevé des prévisions en soirée, purge des anciennes données
-  history.mjs           Lecture des fichiers des préfectures, historique.json
+  history.mjs           Lecture des fichiers des préfectures, relevés et rattrapage
+  dates.mjs             Dates à l'heure de Paris
   notify.mjs            Composition et envoi des mails
   contenu.mjs           Pied de page et pages de contenu/site.yml
   config.mjs            Toutes les variables d'environnement
@@ -171,7 +174,7 @@ server/                 Serveur Node 24, sans framework
 contenu/site.yml        Pied de page et pages obligatoires
 client/admin.js         Composants SGDF utilisés par « Mes camps »
 scripts/build-ui.mjs    Construction de public/ui
-seed/                   Données importées au premier lancement
+seed/                   Camps et historique importés au premier lancement
 dev/                    Intranet simulé pour le développement local
 docker/                 Exemple de configuration nginx
 ```
@@ -182,7 +185,10 @@ Dépendances d'exécution : [nodemailer](https://nodemailer.com) (mails) et [yam
 
 ### Relevé des prévisions et mails
 
-- Toutes les 15 minutes à partir de 17h (heure de Paris), du 1er juin au 30 septembre **et** pendant les dates de chaque camp, le serveur récupère les niveaux du lendemain des massifs suivis. Il met à jour `historique.json` dès qu'une valeur change.
+- Toutes les 15 minutes à partir de 17h (heure de Paris), du 1er juin au 30 septembre **et** pendant les dates de chaque camp, le serveur récupère les niveaux du lendemain des massifs suivis et les enregistre dans l'historique.
+- Chaque jour, il rattrape les niveaux manquants des 7 derniers jours (serveur arrêté un soir, par exemple) : les préfectures gardent leurs fichiers en ligne.
+- L'historique est rangé par massif (clé `département-massif`, par exemple `13-133`), indépendamment des camps : un nouveau camp sur un massif déjà suivi retrouve son historique.
+- `/historique.json?du=AAAA-MM-JJ&au=AAAA-MM-JJ` donne les niveaux d'une période (sans paramètre, tout l'historique). L'accueil ne demande que les 7 jours affichés, la page d'un camp que l'été choisi. `/camps.json` indique pour chaque camp les étés qui ont un historique.
 - Pour chaque camp dont les dates couvrent le lendemain, un mail part à chaque membre qui a un e-mail :
   - dès que la préfecture a publié tous les massifs du camp ;
   - à 21h au plus tard, avec ce qui est disponible ;
