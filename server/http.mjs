@@ -1,6 +1,7 @@
 // Outils HTTP : réponses (gzip, ETag, en-têtes de sécurité), lecture du JSON, contrôles
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
+import { COOKIE_SECURE } from './config.mjs';
 
 export class HttpError extends Error {
     constructor(status, message) {
@@ -23,6 +24,18 @@ export const TYPES = {
 
 const COMPRESSIBLE = /^(text\/|application\/json|image\/svg)/;
 
+// Versions compressées déjà calculées, par empreinte (fichiers du site, réponses identiques)
+const compresses = new Map();
+function compresser(etag, buffer) {
+    let gz = compresses.get(etag);
+    if (!gz) {
+        gz = gzipSync(buffer);
+        if (compresses.size >= 300) compresses.delete(compresses.keys().next().value);
+        compresses.set(etag, gz);
+    }
+    return gz;
+}
+
 export function envoyerContenu(req, res, status, contenu, type, entetes = {}) {
     const buffer = Buffer.isBuffer(contenu) ? contenu : Buffer.from(contenu);
     const etag = `"${createHash('sha1').update(buffer).digest('base64url')}"`;
@@ -36,6 +49,9 @@ export function envoyerContenu(req, res, status, contenu, type, entetes = {}) {
         'X-Frame-Options': 'DENY',
         'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
         'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Resource-Policy': 'same-origin',
+        // HTTPS obligatoire pour ce domaine (sauf en développement, en http)
+        ...(COOKIE_SECURE && { 'Strict-Transport-Security': 'max-age=31536000' }),
         ...entetes
     };
     if (status === 200 && req.headers['if-none-match'] === etag) {
@@ -45,7 +61,7 @@ export function envoyerContenu(req, res, status, contenu, type, entetes = {}) {
     const corps = req.method === 'HEAD' ? undefined : buffer;
     if (buffer.length > 1024 && COMPRESSIBLE.test(type) && /gzip/.test(req.headers['accept-encoding'] ?? '')) {
         res.writeHead(status, { ...base, 'Content-Encoding': 'gzip' });
-        return res.end(corps && gzipSync(corps));
+        return res.end(corps && compresser(etag, corps));
     }
     res.writeHead(status, { ...base, 'Content-Length': buffer.length });
     res.end(corps);
