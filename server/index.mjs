@@ -1,14 +1,15 @@
 // Point d'entrée : initialise les données, lance le relevé périodique et sert le site
 //   /                 → public/ (site et admin)
-//   /camps.json       → camps depuis la base (sans les contacts)
+//   /camps.json       → camps depuis la base (sans dates ni membres)
 //   /historique.json  → historique des niveaux (dans DATA_DIR)
-//   /api/…            → API de l'admin (server/api.mjs)
+//   /connexion        → connexion avec les identifiants Intranet
+//   /api/…            → API (server/api.mjs)
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, copyFileSync, statSync, readdirSync } from 'node:fs';
 import { join, extname, normalize, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { PORT, PUBLIC_DIR, SEED_DIR, DATA_DIR, HISTORY_PATH, massifs } from './config.mjs';
-import { listCamps, seedCamps, users } from './db.mjs';
+import { PORT, PUBLIC_DIR, SEED_DIR, DATA_DIR, HISTORY_PATH, massifs, SUPER_ADMINS, intranetConfigure } from './config.mjs';
+import { listCamps, seedCamps } from './db.mjs';
 import { api } from './api.mjs';
 import { demarrerPlanificateur } from './scheduler.mjs';
 import { HttpError, TYPES, envoyerContenu, json, verifierOrigine } from './http.mjs';
@@ -21,15 +22,15 @@ if (!existsSync(HISTORY_PATH) && existsSync(join(SEED_DIR, 'historique.json'))) 
     console.log('📥 historique.json initialisé depuis seed/.');
 }
 seedCamps(join(SEED_DIR, 'camps.json'));
-if (users.count() === 0) {
-    console.log('👤 Aucun compte admin. Pour en créer un : docker compose exec risquemassif node server/cli.mjs add-user <email> "<nom>"');
-}
+if (!intranetConfigure) console.log('⚠️ Connexion Intranet non configurée : renseigner INTRANET_URL, INTRANET_REALM et INTRANET_CLIENT_ID.');
+if (SUPER_ADMINS.size === 0) console.log("👤 Aucun responsable du site : ajouter son identifiant Intranet dans SUPER_ADMINS.");
 
 // --- Fichiers du site ---
 
 const CSP_ADMIN = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
     + "frame-ancestors 'none'; form-action 'self'; base-uri 'none'";
-const ALIAS = { '/': 'index.html', '/admin': 'admin.html' };
+const ALIAS = { '/': 'index.html', '/admin': 'admin.html', '/connexion': 'connexion.html' };
+const PAGES_PRIVEES = new Set(['admin.html', 'connexion.html']);
 
 // Empreinte d'un fichier du site, recalculée quand il change (mtime)
 const empreintes = new Map();
@@ -80,7 +81,7 @@ function fichierPublic(req, res, chemin) {
     if (!fichier.startsWith(PUBLIC_DIR + sep) || /(^|[\\/])\./.test(relatif)) throw new HttpError(404, 'Introuvable');
     const type = TYPES[extname(fichier)];
     if (!type || !existsSync(fichier) || !statSync(fichier).isFile()) throw new HttpError(404, 'Introuvable');
-    const entetes = relatif === 'admin.html' ? { 'Content-Security-Policy': CSP_ADMIN } : {};
+    const entetes = PAGES_PRIVEES.has(relatif) ? { 'Content-Security-Policy': CSP_ADMIN } : {};
     // Adresse avec empreinte (?v=), morceaux JS et polices au nom unique : le contenu ne change jamais
     const versionne = new URL(req.url, 'http://localhost').searchParams.has('v');
     if (versionne || /^ui\/(communs|polices)\//.test(relatif)) entetes['Cache-Control'] = 'public, max-age=31536000, immutable';
@@ -107,7 +108,7 @@ async function previsionsEnDirect(req, res, dept, dateStr) {
     json(req, res, 200, entree.donnees ?? {}, { 'Cache-Control': 'public, max-age=300' });
 }
 
-const ROBOTS = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\n';
+const ROBOTS = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /connexion\nDisallow: /api/\n';
 
 // --- Serveur ---
 

@@ -1,35 +1,19 @@
-// Gestion des comptes admin en ligne de commande (premier compte, mot de passe oublié).
-//   node server/cli.mjs add-user <email> ["Nom"]
-//   node server/cli.mjs reset-password <email>
-//   node server/cli.mjs list-users
+// Commandes d'exploitation (les comptes sont créés à la première connexion Intranet).
+//   node server/cli.mjs list-users     (comptes déjà connectés)
 //   node server/cli.mjs backup         (copie la base et l'historique dans /data/backups)
 import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { users, backupTo } from './db.mjs';
 import { DATA_DIR } from './config.mjs';
-import { hashPassword, randomPassword } from './auth.mjs';
+import { estSuperAdmin } from './auth.mjs';
 
-const [commande, email, nom = ''] = process.argv.slice(2);
+const [commande] = process.argv.slice(2);
 
 switch (commande) {
-    case 'add-user': {
-        if (!email) usage();
-        if (users.byEmail(email)) erreur(`Le compte ${email} existe déjà.`);
-        const motDePasse = randomPassword();
-        users.create(email, nom, hashPassword(motDePasse));
-        console.log(`✅ Compte créé : ${email}\n   Mot de passe provisoire : ${motDePasse}\n   (à changer dans l'admin, onglet « Comptes »)`);
-        break;
-    }
-    case 'reset-password': {
-        const user = email && users.byEmail(email);
-        if (!user) erreur(`Compte ${email ?? ''} introuvable.`);
-        const motDePasse = randomPassword();
-        users.setPassword(user.id, hashPassword(motDePasse));
-        console.log(`✅ Nouveau mot de passe provisoire pour ${email} : ${motDePasse}`);
-        break;
-    }
     case 'list-users':
-        for (const u of users.list()) console.log(`${u.email}\t${u.nom}\t(créé le ${u.created_at})`);
+        for (const u of users.list()) {
+            console.log(`${u.identifiant}\t${u.nom}\t${u.email ?? ''}\t(dernière connexion ${u.derniere_connexion})${estSuperAdmin(u) ? '\tresponsable' : ''}`);
+        }
         break;
     case 'backup': {
         const dossier = join(DATA_DIR, 'backups');
@@ -44,14 +28,6 @@ switch (commande) {
         break;
     }
     default:
-        usage();
-}
-
-function usage() {
-    erreur('Usage : node server/cli.mjs add-user <email> ["Nom"] | reset-password <email> | list-users | backup');
-}
-
-function erreur(message) {
-    console.error(message);
-    process.exit(1);
+        console.error('Usage : node server/cli.mjs list-users | backup');
+        process.exit(1);
 }

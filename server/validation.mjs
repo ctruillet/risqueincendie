@@ -32,12 +32,24 @@ function validerZone(z) {
     return { dept, id_massif: idMassif, label };
 }
 
-function validerContact(c) {
-    const nom = texte(c.nom, 'Le nom du contact', 80, { requis: false });
-    const email = texte(c.email, `L'email du contact ${nom}`.trim(), 254);
-    if (!EMAIL_RE.test(email)) throw new HttpError(400, `Email invalide : ${email}`);
-    return { nom, email };
+// Identifiant Intranet (numéro d'adhérent) : chiffres, lettres et quelques signes
+const IDENTIFIANT_RE = /^[\p{L}\p{N}._@-]{1,60}$/u;
+
+function validerMembre(m) {
+    const nom = texte(m.nom, 'Le nom du membre', 80, { requis: false });
+    const qui = nom || 'un membre';
+    const email = texte(m.email, `L'e-mail de ${qui}`, 254, { requis: false }) || null;
+    const identifiant = texte(m.identifiant, `Le numéro d'adhérent de ${qui}`, 60, { requis: false }) || null;
+    if (!email && !identifiant) throw new HttpError(400, `Indiquer l'e-mail ou le numéro d'adhérent de ${qui}`);
+    if (email && !EMAIL_RE.test(email)) throw new HttpError(400, `E-mail invalide : ${email}`);
+    if (identifiant && !IDENTIFIANT_RE.test(identifiant)) throw new HttpError(400, `Numéro d'adhérent invalide : ${identifiant}`);
+    return { nom, email, identifiant, role: m.role === 'admin' ? 'admin' : 'participant' };
 }
+
+const doublon = valeurs => {
+    const vues = valeurs.filter(Boolean).map(v => v.toLowerCase());
+    return new Set(vues).size !== vues.length;
+};
 
 export function validerCamp(body) {
     const titre = texte(body.titre, 'Le titre', 120);
@@ -54,8 +66,11 @@ export function validerCamp(body) {
         throw new HttpError(400, 'Le même massif est présent deux fois');
     }
 
-    const contacts = (Array.isArray(body.contacts) ? body.contacts : []).map(validerContact);
-    if (contacts.length > 30) throw new HttpError(400, '30 contacts maximum');
+    const membres = (Array.isArray(body.membres) ? body.membres : []).map(validerMembre);
+    if (membres.length > 50) throw new HttpError(400, '50 membres maximum');
+    if (doublon(membres.map(m => m.email)) || doublon(membres.map(m => m.identifiant))) {
+        throw new HttpError(400, 'Le même membre est présent deux fois');
+    }
 
-    return { titre, debut, fin, zones, contacts };
+    return { titre, debut, fin, zones, membres };
 }

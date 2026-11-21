@@ -1,5 +1,5 @@
-// Base SQLite (module node:sqlite intégré à Node 24) : camps, contacts, comptes admin,
-// sessions et journal des mails envoyés.
+// Base SQLite (module node:sqlite intégré à Node 24) : camps, membres des camps, comptes (connexion
+// par l'Intranet), sessions et journal des mails envoyés.
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -7,6 +7,12 @@ import { DATA_DIR } from './config.mjs';
 
 mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(join(DATA_DIR, 'ne.db'));
+
+// Migration : les comptes à mot de passe local sont remplacés par la connexion Intranet
+if (db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'password_hash'").get()) {
+    db.exec('DROP TABLE IF EXISTS sessions; DROP TABLE users;');
+    console.log("🔑 Anciens comptes à mot de passe supprimés : la connexion passe par l'Intranet (voir SUPER_ADMINS).");
+}
 
 db.exec(`
     PRAGMA journal_mode = WAL;
@@ -38,19 +44,29 @@ db.exec(`
         PRIMARY KEY (camp_id, cle)
     );
 
-    CREATE TABLE IF NOT EXISTS contacts (
-        id        INTEGER PRIMARY KEY,
-        camp_id   TEXT NOT NULL REFERENCES camps(id) ON DELETE CASCADE ON UPDATE CASCADE,
-        nom       TEXT NOT NULL DEFAULT '',
-        email     TEXT NOT NULL
+    -- Membres d'un camp, ajoutés par un admin du camp avec leur e-mail et/ou leur identifiant Intranet.
+    -- Tous ceux qui ont un e-mail reçoivent les prévisions pendant les dates du camp.
+    --   admin       : modifie le camp et ses membres
+    --   participant : voit le camp mis en avant sur l'accueil, peut s'en retirer
+    CREATE TABLE IF NOT EXISTS membres (
+        id          INTEGER PRIMARY KEY,
+        camp_id     TEXT NOT NULL REFERENCES camps(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        role        TEXT NOT NULL DEFAULT 'participant' CHECK (role IN ('admin', 'participant')),
+        nom         TEXT NOT NULL DEFAULT '',
+        email       TEXT COLLATE NOCASE,
+        identifiant TEXT COLLATE NOCASE,
+        CHECK (email IS NOT NULL OR identifiant IS NOT NULL),
+        UNIQUE (camp_id, email),
+        UNIQUE (camp_id, identifiant)
     );
 
+    -- Comptes : créés à la première connexion Intranet. Aucun mot de passe n'est conservé.
     CREATE TABLE IF NOT EXISTS users (
-        id            INTEGER PRIMARY KEY,
-        email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
-        nom           TEXT NOT NULL DEFAULT '',
-        password_hash TEXT NOT NULL,
-        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        id                 INTEGER PRIMARY KEY,
+        identifiant        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        email              TEXT COLLATE NOCASE,
+        nom                TEXT NOT NULL DEFAULT '',
+        derniere_connexion TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -78,13 +94,14 @@ export function backupTo(path) {
     db.prepare('VACUUM INTO ?').run(path);
 }
 
-// Migration : les téléphones ne sont plus enregistrés (aucun SMS n'est envoyé)
-if (db.prepare("SELECT 1 FROM pragma_table_info('contacts') WHERE name = 'telephone'").get()) {
+// Migration : les contacts deviennent des membres « participant » (ils continuent à recevoir les mails)
+if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'contacts'").get()) {
     db.exec(`
-        DELETE FROM contacts WHERE email IS NULL OR email = '';
-        ALTER TABLE contacts DROP COLUMN telephone;
+        INSERT OR IGNORE INTO membres (camp_id, role, nom, email)
+            SELECT camp_id, 'participant', nom, email FROM contacts WHERE email IS NOT NULL AND email <> '';
+        DROP TABLE contacts;
     `);
-    console.log('🧹 Téléphones des contacts supprimés de la base.');
+    console.log('👥 Contacts des camps repris comme participants.');
 }
 
 function transaction(fn) {
@@ -112,31 +129,32 @@ function cleZone(dept, idMassif) {
 
 // --- Camps ---
 
-export function listCamps({ avecContacts = false } = {}) {
+export function listCamps({ avecMembres = false } = {}) {
     const camps = db.prepare('SELECT id, titre, debut, fin FROM camps ORDER BY position, titre').all();
     const zones = db.prepare(`
         SELECT cz.camp_id, cz.cle, cz.label, z.dept, z.id_massif
         FROM camp_zones cz JOIN zones z ON z.cle = cz.cle
         ORDER BY cz.position`).all();
-    const contacts = avecContacts
-        ? db.prepare('SELECT id, camp_id, nom, email FROM contacts ORDER BY id').all()
+    const membres = avecMembres
+        ? db.prepare(`SELECT id, camp_id, role, nom, email, identifiant FROM membres
+                      ORDER BY role = 'admin' DESC, id`).all()
         : [];
     return camps.map(camp => ({
         ...camp,
         zones: zones.filter(z => z.camp_id === camp.id)
             .map(({ cle, label, dept, id_massif }) => ({ cle, label, dept, id_massif })),
-        ...(avecContacts && {
-            contacts: contacts.filter(c => c.camp_id === camp.id)
-                .map(({ id, nom, email }) => ({ id, nom, email }))
+        ...(avecMembres && {
+            membres: membres.filter(m => m.camp_id === camp.id)
+                .map(({ camp_id, ...m }) => m)
         })
     }));
 }
 
 export function getCamp(id) {
-    return listCamps({ avecContacts: true }).find(c => c.id === id) ?? null;
+    return listCamps({ avecMembres: true }).find(c => c.id === id) ?? null;
 }
 
-// Crée ou remplace un camp (zones et contacts compris)
+// Crée ou remplace un camp (zones et membres compris)
 export function saveCamp(camp) {
     transaction(() => {
         const existe = db.prepare('SELECT 1 FROM camps WHERE id = ?').get(camp.id);
@@ -154,10 +172,10 @@ export function saveCamp(camp) {
             db.prepare('INSERT OR IGNORE INTO camp_zones (camp_id, cle, label, position) VALUES (?, ?, ?, ?)')
                 .run(camp.id, cle, zone.label, i);
         });
-        db.prepare('DELETE FROM contacts WHERE camp_id = ?').run(camp.id);
-        for (const c of camp.contacts ?? []) {
-            db.prepare('INSERT INTO contacts (camp_id, nom, email) VALUES (?, ?, ?)')
-                .run(camp.id, c.nom ?? '', c.email);
+        db.prepare('DELETE FROM membres WHERE camp_id = ?').run(camp.id);
+        for (const m of camp.membres ?? []) {
+            db.prepare('INSERT INTO membres (camp_id, role, nom, email, identifiant) VALUES (?, ?, ?, ?, ?)')
+                .run(camp.id, m.role, m.nom ?? '', m.email ?? null, m.identifiant ?? null);
         }
     });
 }
@@ -197,25 +215,47 @@ export function seedCamps(campsJsonPath) {
 
 // --- Comptes et sessions ---
 
+// Un membre correspond à un compte par son identifiant Intranet ou son e-mail
+const EST_LUI = '(m.identifiant = $identifiant OR (m.email IS NOT NULL AND m.email = $email))';
+
 export const users = {
-    count: () => db.prepare('SELECT COUNT(*) AS n FROM users').get().n,
-    list: () => db.prepare('SELECT id, email, nom, created_at FROM users ORDER BY email').all(),
-    byEmail: email => db.prepare('SELECT * FROM users WHERE email = ?').get(email),
-    byId: id => db.prepare('SELECT id, email, nom FROM users WHERE id = ?').get(id),
-    create: (email, nom, hash) =>
-        db.prepare('INSERT INTO users (email, nom, password_hash) VALUES (?, ?, ?)').run(email, nom, hash).lastInsertRowid,
-    setPassword: (id, hash) => {
-        db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, id);
-        db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
-    },
-    delete: id => db.prepare('DELETE FROM users WHERE id = ?').run(id).changes > 0
+    list: () => db.prepare('SELECT id, identifiant, email, nom, derniere_connexion FROM users ORDER BY nom, identifiant').all(),
+    // À chaque connexion : crée ou met à jour le compte avec les informations de l'Intranet, puis
+    // complète les membres qui lui correspondent (e-mail ajouté par l'admin → identifiant, et inversement)
+    connexion: ({ identifiant, email, nom }) => transaction(() => {
+        const { id } = db.prepare(`
+            INSERT INTO users (identifiant, email, nom) VALUES (?, ?, ?)
+            ON CONFLICT (identifiant) DO UPDATE SET
+                email = excluded.email, nom = excluded.nom, derniere_connexion = datetime('now')
+            RETURNING id`).get(identifiant, email, nom);
+        // node:sqlite refuse un paramètre nommé que la requête n'utilise pas : un objet par requête
+        const lui = { $identifiant: identifiant, $email: email };
+        db.prepare(`UPDATE OR IGNORE membres SET identifiant = $identifiant
+                    WHERE identifiant IS NULL AND $email IS NOT NULL AND email = $email`).run(lui);
+        db.prepare(`UPDATE OR IGNORE membres SET email = $email
+                    WHERE email IS NULL AND $email IS NOT NULL AND identifiant = $identifiant`).run(lui);
+        db.prepare(`UPDATE membres AS m SET nom = $nom WHERE nom = '' AND $nom <> '' AND ${EST_LUI}`)
+            .run({ ...lui, $nom: nom });
+        return id;
+    })
+};
+
+export const membres = {
+    // Camps de l'utilisateur et son rôle dans chacun : { campId: 'admin' | 'participant' }
+    roles: user => Object.fromEntries(db.prepare(`
+        SELECT m.camp_id, MAX(m.role = 'admin') AS admin FROM membres m WHERE ${EST_LUI} GROUP BY m.camp_id`)
+        .all({ $identifiant: user.identifiant, $email: user.email ?? null })
+        .map(r => [r.camp_id, r.admin ? 'admin' : 'participant'])),
+    quitter: (campId, user) => db.prepare(`DELETE FROM membres AS m WHERE m.camp_id = $camp AND ${EST_LUI}`)
+        .run({ $camp: campId, $identifiant: user.identifiant, $email: user.email ?? null }).changes > 0,
+    nbAdmins: campId => db.prepare("SELECT COUNT(*) AS n FROM membres WHERE camp_id = ? AND role = 'admin'").get(campId).n
 };
 
 export const sessions = {
     create: (tokenHash, userId, expiresAt) =>
         db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(tokenHash, userId, expiresAt),
     user: tokenHash => db.prepare(`
-        SELECT u.id, u.email, u.nom FROM sessions s JOIN users u ON u.id = s.user_id
+        SELECT u.id, u.identifiant, u.email, u.nom FROM sessions s JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = ? AND s.expires_at > ?`).get(tokenHash, Date.now()),
     delete: tokenHash => db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash),
     purge: () => db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now())
@@ -230,8 +270,10 @@ export const envois = {
     add: ({ campId, date, signature, destinataires, ok, erreur }) => db.prepare(`
         INSERT INTO envois (camp_id, date, signature, destinataires, ok, erreur)
         VALUES (?, ?, ?, ?, ?, ?)`).run(campId, date, signature, destinataires, ok ? 1 : 0, erreur ?? null),
-    recents: (limit = 50) => db.prepare(`
+    // campIds : seulement ces camps (admin d'un camp) ; null : tous (responsable du site)
+    recents: (limit = 50, campIds = null) => db.prepare(`
         SELECT e.id, e.camp_id, c.titre, e.date, e.destinataires, e.ok, e.erreur, e.sent_at
         FROM envois e LEFT JOIN camps c ON c.id = e.camp_id
-        ORDER BY e.id DESC LIMIT ?`).all(limit)
+        ${campIds ? 'WHERE e.camp_id IN (SELECT value FROM json_each(?))' : ''}
+        ORDER BY e.id DESC LIMIT ?`).all(...(campIds ? [JSON.stringify(campIds)] : []), limit)
 };

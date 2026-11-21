@@ -28,7 +28,88 @@ function extractStatus(data, idMassif, reglesDept = {}) {
 // Icône calendrier (Font Awesome, livrée avec le design system SGDF)
 const ICONE_CALENDRIER = '<svg viewBox="0 0 640 640" aria-hidden="true"><path fill="currentColor" d="M224 64C241.7 64 256 78.3 256 96L256 128L384 128L384 96C384 78.3 398.3 64 416 64C433.7 64 448 78.3 448 96L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 96C192 78.3 206.3 64 224 64zM160 304L160 336C160 344.8 167.2 352 176 352L208 352C216.8 352 224 344.8 224 336L224 304C224 295.2 216.8 288 208 288L176 288C167.2 288 160 295.2 160 304zM288 304L288 336C288 344.8 295.2 352 304 352L336 352C344.8 352 352 344.8 352 336L352 304C352 295.2 344.8 288 336 288L304 288C295.2 288 288 295.2 288 304zM432 288C423.2 288 416 295.2 416 304L416 336C416 344.8 423.2 352 432 352L464 352C472.8 352 480 344.8 480 336L480 304C480 295.2 472.8 288 464 288L432 288zM160 432L160 464C160 472.8 167.2 480 176 480L208 480C216.8 480 224 472.8 224 464L224 432C224 423.2 216.8 416 208 416L176 416C167.2 416 160 423.2 160 432zM304 416C295.2 416 288 423.2 288 432L288 464C288 472.8 295.2 480 304 480L336 480C344.8 480 352 472.8 352 464L352 432C352 423.2 344.8 416 336 416L304 416zM416 432L416 464C416 472.8 423.2 480 432 480L464 480C472.8 480 480 472.8 480 464L480 432C480 423.2 472.8 416 464 416L432 416C423.2 416 416 423.2 416 432z"/></svg>';
 
-function genererStructureCamp(camp, labels) {
+// --- Compte : bouton « Se connecter », camps de la personne connectée ---
+
+// Personne connectée et ses camps ({ id, titre, debut, fin, role }), ou rien
+async function chargerCompte() {
+    try {
+        const { user } = await fetchJson('api/me');
+        if (!user) return { user: null, mesCamps: [] };
+        return { user, mesCamps: await fetchJson('api/mes-camps') };
+    } catch {
+        // Hors ligne ou serveur indisponible : la page reste utilisable sans compte
+        return { user: null, mesCamps: [] };
+    }
+}
+
+function afficherCompte(user) {
+    if (!user) return;
+    const compte = document.getElementById('compte');
+    compte.innerHTML = `
+        <span class="compte-nom">${escapeHtml(user.nom || user.identifiant)}</span>
+        ${user.admin ? '<a href="admin" class="bouton-barre principal">Gérer les camps</a>' : ''}
+        <button type="button" id="btn-deconnexion" class="bouton-barre">Déconnexion</button>`;
+    document.getElementById('btn-deconnexion').addEventListener('click', async () => {
+        await fetch('api/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+        location.reload();
+    });
+}
+
+const dateLongue = iso => formatDate(iso, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+// Bandeau « Votre camp » en tête de la carte : rôle, dates (connues des seuls membres), actions
+function genererMonCamp(monCamp) {
+    const aujourdhui = getIsoDate(0);
+    const enCours = monCamp.debut && monCamp.debut <= aujourdhui && aujourdhui <= monCamp.fin;
+    const dates = monCamp.debut
+        ? `Du ${dateLongue(monCamp.debut)} au ${dateLongue(monCamp.fin)}`
+        : 'Dates pas encore fixées';
+    const id = encodeURIComponent(monCamp.id);
+    return `
+        <div class="mon-camp">
+            <p class="mon-camp-tete">
+                <span class="etiquette">Votre camp</span>
+                <span class="etiquette etiquette-claire">${monCamp.role === 'admin' ? 'Admin' : 'Participant'}</span>
+                ${enCours ? '<span class="etiquette etiquette-claire">En cours</span>' : ''}
+            </p>
+            <p class="mon-camp-dates">${ICONE_CALENDRIER}${dates}</p>
+            <div class="mon-camp-actions">
+                ${monCamp.role === 'admin' ? `<a class="lien-action" href="admin#camp=${id}">Gérer le camp</a>` : ''}
+                <button type="button" class="lien-action" data-quitter="${escapeHtml(monCamp.id)}">Me retirer de ce camp</button>
+            </div>
+        </div>`;
+}
+
+// Se retirer d'un camp, après confirmation
+function activerQuitter(container, mesCamps, statusLine) {
+    const dialog = document.getElementById('dialog-quitter');
+    container.addEventListener('click', e => {
+        const bouton = e.target.closest('[data-quitter]');
+        if (!bouton) return;
+        const camp = mesCamps.find(c => c.id === bouton.dataset.quitter);
+        document.getElementById('dialog-quitter-texte').textContent = camp.role === 'admin'
+            ? `Vous ne serez plus admin de « ${camp.titre} » et ne recevrez plus ses prévisions par mail.`
+            : `Vous ne recevrez plus les prévisions de « ${camp.titre} » par mail. Un admin du camp pourra vous rajouter.`;
+        dialog.returnValue = '';
+        dialog.showModal();
+        dialog.addEventListener('close', async () => {
+            if (dialog.returnValue !== 'ok') return bouton.focus();
+            try {
+                const res = await fetch(`api/mes-camps/${encodeURIComponent(camp.id)}`, { method: 'DELETE' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.erreur ?? `Erreur ${res.status}`);
+                const carte = bouton.closest('.camp');
+                carte.classList.remove('camp-mien');
+                carte.querySelector('.mon-camp').remove();
+                statusLine.textContent = `Vous n'êtes plus membre de « ${camp.titre} ».`;
+            } catch (err) {
+                statusLine.textContent = `Impossible de vous retirer du camp : ${err.message}`;
+            }
+        }, { once: true });
+    });
+}
+
+function genererStructureCamp(camp, labels, monCamp = null) {
     const rowsHtml = camp.zones.map(zone => {
         const cle = escapeHtml(zone.cle);
         return `
@@ -55,8 +136,9 @@ function genererStructureCamp(camp, labels) {
 
     const lienEte = `camp.html?camp=${encodeURIComponent(camp.id)}`;
     return `
-        <section class="carte camp">
+        <section class="carte camp${monCamp ? ' camp-mien' : ''}">
             <h2 class="carte-titre"><a href="${lienEte}">${escapeHtml(camp.titre)}</a></h2>
+            ${monCamp ? genererMonCamp(monCamp) : ''}
             <div class="rows-container">${rowsHtml}</div>
             <a class="lien-action" href="${lienEte}">${ICONE_CALENDRIER}Historique de l'été</a>
         </section>`;
@@ -135,18 +217,21 @@ async function init() {
         ? { jour: "Aujourd'hui", lendemain: 'Demain' }
         : { jour: formatDate(todayKey), lendemain: formatDate(tomorrowKey) };
 
-    let camps, regles, history;
+    let camps, regles, history, compte;
     try {
-        [camps, regles, history] = await Promise.all([
+        [camps, regles, history, compte] = await Promise.all([
             fetchJson('./camps.json'),
             fetchJson('./regles.json'),
-            fetchJson('./historique.json')
+            fetchJson('./historique.json'),
+            chargerCompte()
         ]);
     } catch (e) {
         console.error("Erreur d'initialisation :", e);
         container.innerHTML = '<p class="loading">Impossible de charger les données. Réessayez plus tard.</p>';
         return;
     }
+
+    afficherCompte(compte.user);
 
     // Les camps terminés ne sont plus affichés (leur page « été » reste accessible)
     // (le serveur ne publie pas les dates des camps, seulement s'ils sont terminés)
@@ -156,10 +241,15 @@ async function init() {
         statusLine.textContent = '';
         return;
     }
+    // Les camps de la personne connectée passent en premier
+    const mesCamps = new Map(compte.mesCamps.map(c => [c.id, c]));
+    camps = [...camps.filter(c => mesCamps.has(c.id)), ...camps.filter(c => !mesCamps.has(c.id))];
+
     const zones = camps.flatMap(c => c.zones);
     const historyByDate = new Map(history.map(item => [item.date, item]));
     afficherDepartements(zones);
-    container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels)).join('');
+    container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels, mesCamps.get(camp.id))).join('');
+    activerQuitter(container, compte.mesCamps, statusLine);
 
     // Statuts courants par clé de zone, initialisés depuis l'historique
     const statuts = {

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta name="description" content="Connexion avec les identifiants Intranet SGDF pour retrouver ses camps Nature Environnement.">
+    <title>Connexion – Nature Environnement</title>
+    <link rel="stylesheet" href="ui/sgdf.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <meta name="theme-color" content="#003a5d">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+
+    <header class="barre">
+        <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+    </header>
+
+    <main class="container">
+        <a href="./" class="retour">← Retour aux prévisions</a>
+        <div class="titre-page">
+            <p class="surtitre">Espace des camps</p>
+            <h1>Connexion</h1>
+            <p class="chapeau">Retrouvez vos camps : dates, membres et prévisions envoyées par mail.</p>
+        </div>
+
+        <section class="carte carte-etroite">
+            <h2>Avec votre compte Intranet SGDF</h2>
+            <form id="form-login" class="form">
+                <label class="champ">Identifiant Intranet (numéro d'adhérent)
+                    <input name="identifiant" type="text" autocomplete="username" autocapitalize="none"
+                           spellcheck="false" inputmode="text" maxlength="100" required>
+                </label>
+                <label class="champ">Mot de passe
+                    <input name="password" type="password" autocomplete="current-password" maxlength="200" required>
+                </label>
+                <p class="form-error alerte" role="alert" hidden></p>
+                <button type="submit" class="bouton">Se connecter</button>
+            </form>
+            <p class="hint-form">Votre mot de passe est vérifié par l'Intranet SGDF. Il n'est pas conservé par ce site.</p>
+        </section>
+    </main>
+
+    <footer class="pied">
+        <div class="pied-corps">
+            <div class="pied-haut">
+                <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+            </div>
+            <p class="pied-legal">Initiative personnelle pour les camps Nature Environnement, non éditée par les Scouts et Guides de France</p>
+        </div>
+    </footer>
+
+    <script src="js/connexion.js" defer></script>
+</body>
+</html>

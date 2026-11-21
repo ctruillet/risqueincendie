@@ -1,31 +1,11 @@
-// Mots de passe (scrypt), sessions par cookie et limitation des tentatives de connexion
-import { scryptSync, randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+// Connexion par l'Intranet, sessions par cookie, rôles et limitation des tentatives de connexion
+import { randomBytes, createHash } from 'node:crypto';
 import { users, sessions } from './db.mjs';
-import { COOKIE_SECURE } from './config.mjs';
+import { COOKIE_SECURE, SUPER_ADMINS } from './config.mjs';
+import { verifierIntranet } from './intranet.mjs';
 
 const SESSION_DAYS = 30;
 const COOKIE_NAME = 'ne_session';
-export const MIN_PASSWORD_LENGTH = 10;
-
-export function hashPassword(password) {
-    const salt = randomBytes(16);
-    const hash = scryptSync(password, salt, 64);
-    return `scrypt$${salt.toString('base64')}$${hash.toString('base64')}`;
-}
-
-function verifyPassword(password, stored) {
-    const [, salt, hash] = stored.split('$');
-    const attendu = Buffer.from(hash, 'base64');
-    const calcule = scryptSync(password, Buffer.from(salt, 'base64'), attendu.length);
-    return timingSafeEqual(attendu, calcule);
-}
-
-// Hash factice : une connexion avec un email inconnu prend le même temps
-const HASH_FACTICE = hashPassword(randomBytes(16).toString('hex'));
-
-export function randomPassword() {
-    return randomBytes(12).toString('base64url');
-}
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 
@@ -38,14 +18,23 @@ function cookie(value, maxAge) {
     return `${COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${COOKIE_SECURE ? '; Secure' : ''}`;
 }
 
-// Retourne { cookie } si les identifiants sont bons, sinon null
-export function login(email, password) {
-    const user = users.byEmail(String(email ?? '').trim());
-    const ok = verifyPassword(String(password ?? ''), user?.password_hash ?? HASH_FACTICE);
-    if (!user || !ok) return null;
+// Responsable du site : son identifiant Intranet ou son e-mail est dans SUPER_ADMINS
+export const estSuperAdmin = user => Boolean(user)
+    && (SUPER_ADMINS.has(user.identifiant.toLowerCase()) || (Boolean(user.email) && SUPER_ADMINS.has(user.email.toLowerCase())));
+
+// Retourne { cookie } si l'Intranet accepte les identifiants, sinon null
+export async function login(identifiant, motDePasse) {
+    const id = String(identifiant ?? '').trim();
+    const mdp = String(motDePasse ?? '');
+    if (!id || !mdp || id.length > 100 || mdp.length > 200) return null;
+    const profil = await verifierIntranet(id, mdp);
+    if (!profil) return null;
+    // Crée ou met à jour le compte, et le relie aux camps où il a été ajouté (par e-mail ou identifiant)
+    const userId = users.connexion(profil);
     const token = randomBytes(32).toString('base64url');
-    sessions.create(sha256(token), user.id, Date.now() + SESSION_DAYS * 86400_000);
+    sessions.create(sha256(token), userId, Date.now() + SESSION_DAYS * 86400_000);
     sessions.purge();
+    console.log(`🔑 Connexion de ${profil.identifiant}`);
     return { cookie: cookie(token, SESSION_DAYS * 86400) };
 }
 
@@ -57,12 +46,8 @@ export function logout(req) {
 
 export function currentUser(req) {
     const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
-    return token ? sessions.user(sha256(token)) ?? null : null;
-}
-
-export function checkPassword(userId, password) {
-    const user = users.byEmail(users.byId(userId)?.email ?? '');
-    return !!user && verifyPassword(String(password ?? ''), user.password_hash);
+    const user = token ? sessions.user(sha256(token)) : null;
+    return user ? { ...user, superAdmin: estSuperAdmin(user) } : null;
 }
 
 // 10 tentatives ratées par adresse IP et par quart d'heure

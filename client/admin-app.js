@@ -1,4 +1,4 @@
-// Administration, une fois connecté : camps, mails envoyés, comptes
+// Administration, une fois connecté : camps, membres, mails envoyés
 import '@sgdf/ui/card';
 import '@sgdf/ui/tag';
 import '@sgdf/ui/tab-group';

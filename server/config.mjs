@@ -30,6 +30,21 @@ export const SMTP = {
     starttls: env.SMTP_STARTTLS !== '0'
 };
 
+// Connexion avec les identifiants Intranet SGDF (serveur d'authentification Keycloak).
+// En local, docker-compose.dev.yml lance un Keycloak qui joue ce rôle.
+export const INTRANET = {
+    url: (env.INTRANET_URL ?? '').replace(/\/$/, ''),
+    realm: env.INTRANET_REALM ?? '',
+    clientId: env.INTRANET_CLIENT_ID ?? '',
+    clientSecret: env.INTRANET_CLIENT_SECRET ?? ''
+};
+export const intranetConfigure = Boolean(INTRANET.url && INTRANET.realm && INTRANET.clientId);
+
+// Responsables du site (identifiants Intranet ou e-mails, séparés par des virgules) :
+// créent et suppriment les camps, et sont admins de tous les camps
+export const SUPER_ADMINS = new Set((env.SUPER_ADMINS ?? '').split(',')
+    .map(s => s.trim().toLowerCase()).filter(Boolean));
+
 // Le cookie de session n'est envoyé qu'en HTTPS, sauf COOKIE_SECURE=0 (développement en http)
 export const COOKIE_SECURE = env.COOKIE_SECURE !== '0';
 

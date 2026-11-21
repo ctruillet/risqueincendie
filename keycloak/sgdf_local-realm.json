@@ -1,0 +1,83 @@
+{
+  "realm": "sgdf_local",
+  "displayName": "Intranet SGDF (simulation locale)",
+  "enabled": true,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "clients": [
+    {
+      "clientId": "ne-local",
+      "name": "Prévisions des massifs (local)",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "secret-de-developpement-local",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "100000001",
+      "firstName": "Camille",
+      "lastName": "Responsable",
+      "email": "camille.responsable@example.org",
+      "emailVerified": true,
+      "enabled": true,
+      "attributes": {
+        "role_de_test": [
+          "responsable du site (SUPER_ADMINS)"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "chef",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "100000002",
+      "firstName": "Dominique",
+      "lastName": "Admin",
+      "email": "dominique.admin@example.org",
+      "emailVerified": true,
+      "enabled": true,
+      "attributes": {
+        "role_de_test": [
+          "à nommer admin d'un camp"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "chef",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "100000003",
+      "firstName": "Alex",
+      "lastName": "Participant",
+      "email": "alex.participant@example.org",
+      "emailVerified": true,
+      "enabled": true,
+      "attributes": {
+        "role_de_test": [
+          "à ajouter comme participant"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "chef",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

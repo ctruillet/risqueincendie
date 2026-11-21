@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ne-massifs-v13';
+const CACHE_NAME = 'ne-massifs-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -39,9 +39,9 @@ self.addEventListener('activate', (e) => {
 // Réseau d'abord : on garde une copie à jour en cache, utilisée hors ligne
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  // L'admin et son API ne passent jamais par le cache
+  // L'admin, la connexion et l'API ne passent jamais par le cache
   const { pathname } = new URL(e.request.url);
-  if (pathname.startsWith('/api/') || /^\/(admin(\.html)?|js\/admin\.js|css\/admin\.css)$/.test(pathname)) return;
+  if (pathname.startsWith('/api/') || /^\/(admin(\.html)?|connexion(\.html)?|js\/(admin|connexion)\.js|css\/admin\.css)$/.test(pathname)) return;
 
   e.respondWith(
     // no-cache : contourne le cache HTTP du navigateur

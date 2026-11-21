@@ -1,4 +1,5 @@
-// Interface d'administration : camps (dates, massifs, contacts), mails envoyés, comptes.
+// Interface d'administration : camps (dates, massifs, membres) et mails envoyés.
+// Le responsable du site voit tous les camps ; un admin de camp, seulement les siens.
 // Les composants sgdf-* viennent du design system SGDF (ui/admin.js).
 const $ = sel => document.querySelector(sel);
 
@@ -16,8 +17,8 @@ async function api(chemin, { method = 'GET', body } = {}) {
         body: body ? JSON.stringify(body) : undefined
     });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 && chemin !== 'login') {
-        afficherLogin();
+    if (res.status === 401) {
+        allerConnexion();
         throw new Error('Session expirée, reconnectez-vous.');
     }
     if (!res.ok) throw new Error(data.erreur ?? `Erreur ${res.status}`);
@@ -27,8 +28,8 @@ async function api(chemin, { method = 'GET', body } = {}) {
 // --- Messages ---
 
 function notifier(texte, { erreur = false } = {}) {
-    // Avant la connexion, les notifications ne sont pas encore chargées : message dans le formulaire
-    if (!customElements.get('sgdf-toast')) return erreurForm($('#form-login'), texte);
+    // Composants pas encore chargés : simple boîte d'alerte du navigateur
+    if (!customElements.get('sgdf-toast')) return alert(texte);
     $('#toast').create(texte, erreur
         ? { variant: 'danger', title: 'Erreur', duration: 8000 }
         : { variant: 'success', title: 'C\'est fait' });
@@ -79,31 +80,15 @@ function confirmer({ titre, texte, bouton = 'Confirmer', variante = 'danger' }) 
 
 const valeur = (racine, nom) => String(racine.querySelector(`[name=${nom}]`)?.value ?? '').trim();
 
-// --- Connexion ---
+// --- Connexion (par l'Intranet, sur la page /connexion) ---
 
-function afficherLogin() {
-    $('#vue-app').hidden = true;
-    $('#session').hidden = true;
-    $('#vue-login').hidden = false;
-    $('#form-login [name=email]').focus();
+function allerConnexion() {
+    location.replace(`connexion?retour=${encodeURIComponent('/admin' + location.hash)}`);
 }
-
-$('#form-login').addEventListener('submit', async e => {
-    e.preventDefault();
-    const form = e.target;
-    erreurForm(form);
-    try {
-        await api('login', { method: 'POST', body: { email: valeur(form, 'email'), password: form.querySelector('[name=password]').value } });
-        form.reset();
-        await demarrer();
-    } catch (err) {
-        erreurForm(form, err.message);
-    }
-});
 
 $('#btn-logout').addEventListener('click', async () => {
     await api('logout', { method: 'POST', body: {} }).catch(() => {});
-    afficherLogin();
+    location.replace('./');
 });
 
 // --- Onglets ---
@@ -111,7 +96,6 @@ $('#btn-logout').addEventListener('click', async () => {
 $('#vue-app').addEventListener('sgdf-tab-show', e => {
     if (e.target !== $('#vue-app')) return;
     if (e.detail.name === 'envois') chargerEnvois();
-    if (e.detail.name === 'comptes') chargerUsers();
     if (e.detail.name === 'camps') chargerStatus();
 });
 
@@ -159,15 +143,16 @@ const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year:
 function afficherCamps() {
     const liste = $('#liste-camps');
     if (camps.length === 0) {
-        liste.innerHTML = '<p class="vide">Aucun camp pour l\'instant.</p>';
+        liste.innerHTML = `<p class="vide">${utilisateur.superAdmin ? 'Aucun camp pour l\'instant.' : 'Aucun camp à gérer.'}</p>`;
         return;
     }
     liste.innerHTML = camps.map((camp, i) => {
         const dates = camp.debut ? `Du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'Pas de dates : aucun mail envoyé';
         const zones = camp.zones.map(z => escapeHtml(z.label)).join(', ');
-        const contacts = camp.contacts.length
-            ? camp.contacts.map(c => escapeHtml(c.nom || c.email)).join(', ')
-            : 'Aucun contact';
+        const membres = camp.membres.length
+            ? camp.membres.map(m => `${escapeHtml(m.nom || m.email || m.identifiant)}${m.role === 'admin' ? ' (admin)' : ''}`).join(', ')
+            : 'Aucun membre';
+        const responsable = utilisateur.superAdmin;
         return `
         <sgdf-card class="camp-item" data-id="${escapeHtml(camp.id)}">
             <h3 slot="header" class="camp-titre">${escapeHtml(camp.titre)}</h3>
@@ -175,17 +160,18 @@ function afficherCamps() {
             <ul class="camp-meta">
                 <li><sgdf-icon name="calendar-days" library="solid"></sgdf-icon>${dates}</li>
                 <li><sgdf-icon name="tree" library="solid"></sgdf-icon>${zones}</li>
-                <li><sgdf-icon name="envelope" library="solid"></sgdf-icon>${contacts}</li>
+                <li><sgdf-icon name="users" library="solid"></sgdf-icon>${membres}</li>
             </ul>
             <div slot="footer" class="actions actions-camp">
                 <sgdf-button size="small" appearance="outlined" data-action="modifier">
                     <sgdf-icon slot="prefix" name="pen" library="solid"></sgdf-icon>Modifier
                 </sgdf-button>
                 <span class="actions-icones">
-                    ${iconeAction('envoyer', 'paper-plane', 'Envoyer la prévision de demain aux contacts', !camp.contacts.length)}
+                    ${iconeAction('envoyer', 'paper-plane', 'Envoyer la prévision de demain aux membres', !camp.membres.some(m => m.email))}
+                    ${responsable ? `
                     ${iconeAction('monter', 'arrow-up', 'Monter', i === 0)}
                     ${iconeAction('descendre', 'arrow-down', 'Descendre', i === camps.length - 1)}
-                    ${iconeAction('supprimer', 'trash-can', 'Supprimer le camp', false, 'danger')}
+                    ${iconeAction('supprimer', 'trash-can', 'Supprimer le camp', false, 'danger')}` : ''}
                 </span>
             </div>
         </sgdf-card>`;
@@ -210,17 +196,17 @@ $('#liste-camps').addEventListener('click', async e => {
         case 'envoyer':
             if (!await confirmer({
                 titre: 'Envoyer la prévision',
-                texte: `Envoyer maintenant la prévision de demain aux contacts de « ${camp.titre} » ?`,
+                texte: `Envoyer maintenant la prévision de demain aux membres de « ${camp.titre} » ?`,
                 bouton: 'Envoyer', variante: 'primary'
             })) return;
             return action(bouton, async () => {
                 const r = await api(`camps/${encodeURIComponent(id)}/envoyer`, { method: 'POST', body: {} });
-                notifier(r.erreur ? `Envoyé, avec des erreurs : ${r.erreur}` : 'Mail envoyé aux contacts.', { erreur: Boolean(r.erreur) });
+                notifier(r.erreur ? `Envoyé, avec des erreurs : ${r.erreur}` : 'Mail envoyé aux membres.', { erreur: Boolean(r.erreur) });
             });
         case 'supprimer':
             if (!await confirmer({
                 titre: 'Supprimer le camp',
-                texte: `Supprimer « ${camp.titre} » ? Ses contacts seront supprimés (l'historique des massifs est conservé).`,
+                texte: `Supprimer « ${camp.titre} » ? Ses membres en seront retirés (l'historique des massifs est conservé).`,
                 bouton: 'Supprimer'
             })) return;
             return action(bouton, async () => {
@@ -264,11 +250,13 @@ function ajouterZone(zone = {}) {
     ligne.querySelector('[name=label]').value = zone.label ?? '';
 }
 
-function ajouterContact(contact = {}) {
-    const ligne = $('#tpl-contact').content.firstElementChild.cloneNode(true);
-    $('#contacts').append(ligne);
-    ligne.querySelector('[name=nom]').value = contact.nom ?? '';
-    ligne.querySelector('[name=email]').value = contact.email ?? '';
+function ajouterMembre(membre = {}) {
+    const ligne = $('#tpl-membre').content.firstElementChild.cloneNode(true);
+    $('#membres').append(ligne);
+    ligne.querySelector('[name=nom]').value = membre.nom ?? '';
+    ligne.querySelector('[name=email]').value = membre.email ?? '';
+    ligne.querySelector('[name=identifiant]').value = membre.identifiant ?? '';
+    ligne.querySelector('[name=role]').value = membre.role ?? 'participant';
 }
 
 // Changer de département recharge la liste de ses massifs
@@ -280,14 +268,14 @@ $('#zones').addEventListener('change', e => {
     selectMassif.value = massifs[dept.value]?.massifs[0]?.id ?? '';
 });
 
-for (const conteneur of ['#zones', '#contacts']) {
+for (const conteneur of ['#zones', '#membres']) {
     $(conteneur).addEventListener('click', e => {
         if (e.target.closest('.btn-suppr')) e.target.closest('.ligne-form').remove();
     });
 }
 
 $('#btn-ajout-zone').addEventListener('click', () => ajouterZone());
-$('#btn-ajout-contact').addEventListener('click', () => ajouterContact());
+$('#btn-ajout-membre').addEventListener('click', () => ajouterMembre());
 
 function ouvrirEdition(camp = null) {
     campEdite = camp;
@@ -299,9 +287,9 @@ function ouvrirEdition(camp = null) {
     form.querySelector('[name=fin]').value = camp?.fin ?? '';
     form.querySelector('[name=fin]').min = camp?.debut ?? '';
     $('#zones').innerHTML = '';
-    $('#contacts').innerHTML = '';
+    $('#membres').innerHTML = '';
     (camp?.zones.length ? camp.zones : [{}]).forEach(ajouterZone);
-    (camp?.contacts.length ? camp.contacts : [{}]).forEach(ajouterContact);
+    (camp?.membres.length ? camp.membres : [{ role: 'admin' }]).forEach(ajouterMembre);
 
     $('#vue-liste').hidden = true;
     $('#vue-edition').hidden = false;
@@ -336,9 +324,9 @@ $('#form-camp').addEventListener('submit', async e => {
         zones: [...document.querySelectorAll('#zones .zone-ligne')].map(l => ({
             dept: valeur(l, 'dept'), id_massif: valeur(l, 'id_massif'), label: valeur(l, 'label')
         })),
-        contacts: [...document.querySelectorAll('#contacts .contact-ligne')]
-            .map(l => ({ nom: valeur(l, 'nom'), email: valeur(l, 'email') }))
-            .filter(c => c.nom || c.email)
+        membres: [...document.querySelectorAll('#membres .membre-ligne')]
+            .map(l => ({ nom: valeur(l, 'nom'), email: valeur(l, 'email'), identifiant: valeur(l, 'identifiant'), role: valeur(l, 'role') }))
+            .filter(m => m.nom || m.email || m.identifiant)
     };
     const bouton = form.querySelector('sgdf-button[submit]');
     bouton.loading = true;
@@ -377,83 +365,31 @@ async function chargerEnvois() {
     }
 }
 
-// --- Comptes ---
-
-async function chargerUsers() {
-    const liste = await api('users');
-    $('#liste-users').innerHTML = liste.map(u => `
-        <li data-id="${u.id}" data-email="${escapeHtml(u.email)}">
-            <span><strong>${escapeHtml(u.email)}</strong>${u.nom ? ` — ${escapeHtml(u.nom)}` : ''}</span>
-            ${u.id === utilisateur.id
-                ? '<sgdf-tag size="small" variant="neutral">Vous</sgdf-tag>'
-                : `<sgdf-button size="small" appearance="text" variant="danger" data-action="suppr-user">
-                       <sgdf-icon slot="prefix" name="trash-can" library="solid"></sgdf-icon>Supprimer
-                   </sgdf-button>`}
-        </li>`).join('');
-}
-
-$('#liste-users').addEventListener('click', async e => {
-    const bouton = e.target.closest('[data-action=suppr-user]');
-    if (!bouton) return;
-    const li = bouton.closest('li');
-    if (!await confirmer({ titre: 'Supprimer le compte', texte: `Supprimer le compte ${li.dataset.email} ?`, bouton: 'Supprimer' })) return;
-    action(bouton, async () => {
-        await api(`users/${li.dataset.id}`, { method: 'DELETE' });
-        await chargerUsers();
-        notifier('Compte supprimé.');
-    });
-});
-
-$('#form-user').addEventListener('submit', async e => {
-    e.preventDefault();
-    const form = e.target;
-    erreurForm(form);
-    try {
-        const r = await api('users', { method: 'POST', body: { email: valeur(form, 'email'), nom: valeur(form, 'nom') } });
-        form.reset();
-        await chargerUsers();
-        $('#mdp-cree-texte').textContent = `Mot de passe provisoire de ${r.email} :`;
-        $('#mdp-cree-valeur').textContent = r.motDePasse;
-        $('#mdp-cree').open = true;
-    } catch (err) {
-        erreurForm(form, err.message);
-    }
-});
-
-$('#mdp-cree-ok').addEventListener('click', () => { $('#mdp-cree').open = false; });
-
-$('#form-password').addEventListener('submit', async e => {
-    e.preventDefault();
-    const form = e.target;
-    erreurForm(form);
-    try {
-        await api('password', {
-            method: 'POST',
-            body: { actuel: form.querySelector('[name=actuel]').value, nouveau: form.querySelector('[name=nouveau]').value }
-        });
-        form.reset();
-        notifier('Mot de passe changé. Les autres appareils connectés ont été déconnectés.');
-    } catch (err) {
-        erreurForm(form, err.message);
-    }
-});
-
 // --- Démarrage ---
 
 async function demarrer() {
     const { user } = await api('me');
-    if (!user) return afficherLogin();
-    // Composants de l'admin connecté, chargés seulement maintenant (page de connexion plus légère)
+    if (!user) return allerConnexion();
+    utilisateur = user;
+    // Composants de l'admin, chargés seulement maintenant
     await Promise.all([import('/ui/admin.js'), import('/ui/admin-app.js')]);
     await customElements.whenDefined('sgdf-select');
-    utilisateur = user;
-    $('#user-email').textContent = user.email;
-    $('#form-password [name=email]').value = user.email;
-    $('#vue-login').hidden = true;
+    $('#user-nom').textContent = user.nom || user.identifiant;
     $('#session').hidden = false;
+    if (!user.admin) {
+        $('#vue-aucun').hidden = false;
+        return;
+    }
+    // Créer, supprimer, ordonner les camps et lancer un relevé : responsable du site seulement
+    for (const el of document.querySelectorAll('.responsable')) el.hidden = !user.superAdmin;
     $('#vue-app').hidden = false;
     massifs = await fetchJson('massifs.json');
     await Promise.all([chargerCamps(), chargerStatus()]);
+    // Lien « Gérer le camp » de l'accueil : admin#camp=<id>
+    const demande = new URLSearchParams(location.hash.slice(1)).get('camp');
+    const camp = camps.find(c => c.id === demande);
+    if (camp) ouvrirEdition(camp);
+    history.replaceState(null, '', location.pathname);
 }
 
 demarrer().catch(e => notifier(e.message, { erreur: true }));

@@ -1,5 +1,5 @@
-// Administration, page de connexion : seulement les composants du formulaire.
-// Le reste de l'admin (client/admin-app.js) est chargé après la connexion.
+// Administration : composants de base (champs, boutons, messages, icônes).
+// Chargé avec client/admin-app.js une fois la personne connectée (la connexion se fait sur /connexion).
 import '@sgdf/ui/i18n';
 import { setIconsBasePath } from '@sgdf/ui/utils';
 import '@sgdf/ui/input';

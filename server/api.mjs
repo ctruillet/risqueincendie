@@ -1,13 +1,44 @@
-// API de l'admin : /api/…
-import { listCamps, getCamp, saveCamp, deleteCamp, reorderCamps, users, envois } from './db.mjs';
-import { login, logout, currentUser, hashPassword, randomPassword, checkPassword,
-    tropDeTentatives, noterEchec, MIN_PASSWORD_LENGTH } from './auth.mjs';
+// API du site : /api/…
+// Trois niveaux d'accès, après connexion avec les identifiants Intranet :
+//   responsable du site (SUPER_ADMINS) : tout, y compris créer, supprimer et ordonner les camps
+//   admin d'un camp                    : modifie ce camp (dates, massifs, membres) et envoie ses mails
+//   participant d'un camp              : voit ce camp mis en avant sur l'accueil et peut s'en retirer
+import { listCamps, getCamp, saveCamp, deleteCamp, reorderCamps, membres, envois } from './db.mjs';
+import { login, logout, currentUser, tropDeTentatives, noterEchec } from './auth.mjs';
 import { readHistory, getParisDate } from './history.mjs';
 import { envoyerCamp, envoyerTest, smtpConfigure } from './notify.mjs';
 import { passage, etat } from './scheduler.mjs';
 import { HttpError, json, lireJson, ipClient } from './http.mjs';
-import { validerCamp, slug, texte, EMAIL_RE } from './validation.mjs';
+import { validerCamp, slug } from './validation.mjs';
 import { UPDATE_INTERVAL_MINUTES, SEASON_START, SEASON_END, START_HOUR } from './config.mjs';
+
+// --- Droits ---
+
+// Rôle de l'utilisateur dans chaque camp : { campId: 'admin' | 'participant' }
+const rolesDe = user => membres.roles(user);
+
+const campsAdmin = user => user.superAdmin
+    ? listCamps({ avecMembres: true })
+    : listCamps({ avecMembres: true }).filter(c => rolesDe(user)[c.id] === 'admin');
+
+function exigerSuperAdmin(user) {
+    if (!user.superAdmin) throw new HttpError(403, 'Réservé au responsable du site');
+}
+
+function exigerAdmin(user, camp) {
+    if (!user.superAdmin && rolesDe(user)[camp.id] !== 'admin') {
+        throw new HttpError(403, "Vous n'êtes pas admin de ce camp");
+    }
+}
+
+// Admin d'au moins un camp (accès à la page d'administration)
+function exigerUnCamp(user) {
+    if (!user.superAdmin && !Object.values(rolesDe(user)).includes('admin')) {
+        throw new HttpError(403, "Vous n'êtes admin d'aucun camp");
+    }
+}
+
+const ADMIN_REQUIS = 'Le camp doit garder au moins un admin : nommez-en un autre avant';
 
 // --- Routes sans connexion ---
 
@@ -15,26 +46,65 @@ async function routeLogin(req, res) {
     const ip = ipClient(req);
     if (tropDeTentatives(ip)) throw new HttpError(429, 'Trop de tentatives, réessayer dans 15 minutes');
     const body = await lireJson(req);
-    const session = login(body.email, body.password);
+    const session = await login(body.identifiant, body.password);
     if (!session) {
         noterEchec(ip);
-        throw new HttpError(401, 'Email ou mot de passe incorrect');
+        throw new HttpError(401, 'Identifiant ou mot de passe incorrect');
     }
     json(req, res, 200, { ok: true }, { 'Set-Cookie': session.cookie });
 }
 
-// --- Camps ---
+const profil = user => user && {
+    identifiant: user.identifiant,
+    nom: user.nom,
+    email: user.email,
+    superAdmin: user.superAdmin,
+    admin: user.superAdmin || Object.values(rolesDe(user)).includes('admin')
+};
 
-async function routeCamps(req, res, id, action) {
+// --- Mes camps (tout utilisateur connecté) ---
+
+async function routeMesCamps(req, res, user, id) {
+    const roles = rolesDe(user);
+    if (req.method === 'GET' && !id) {
+        const camps = listCamps({ avecMembres: true }).filter(c => roles[c.id]).map(({ membres: liste, ...camp }) => ({
+            ...camp,
+            role: roles[camp.id],
+            // Les coordonnées des autres membres ne sont montrées qu'aux admins du camp
+            ...(roles[camp.id] === 'admin' && { membres: liste })
+        }));
+        return json(req, res, 200, camps);
+    }
+    // Se retirer d'un camp
+    if (req.method === 'DELETE' && id) {
+        if (!roles[id]) throw new HttpError(404, "Vous n'êtes pas membre de ce camp");
+        if (roles[id] === 'admin' && membres.nbAdmins(id) <= 1) {
+            throw new HttpError(400, `${ADMIN_REQUIS} de vous retirer.`);
+        }
+        membres.quitter(id, user);
+        console.log(`👋 ${user.identifiant} s'est retiré du camp ${id}`);
+        return json(req, res, 200, { ok: true });
+    }
+    throw new HttpError(404, 'Introuvable');
+}
+
+// --- Camps (admins) ---
+
+async function routeCamps(req, res, user, id, action) {
     const m = req.method;
-    if (m === 'GET' && !id) return json(req, res, 200, listCamps({ avecContacts: true }));
+    if (m === 'GET' && !id) {
+        exigerUnCamp(user);
+        return json(req, res, 200, campsAdmin(user));
+    }
     if (m === 'POST' && id === 'ordre') {
+        exigerSuperAdmin(user);
         const { ids } = await lireJson(req);
         if (!Array.isArray(ids)) throw new HttpError(400, 'Liste attendue');
         reorderCamps(ids.map(String));
         return json(req, res, 200, { ok: true });
     }
     if (m === 'POST' && !id) {
+        exigerSuperAdmin(user);
         const camp = validerCamp(await lireJson(req));
         camp.id = slug(camp.titre);
         saveCamp(camp);
@@ -43,15 +113,22 @@ async function routeCamps(req, res, id, action) {
 
     const camp = getCamp(id);
     if (!camp) throw new HttpError(404, 'Camp introuvable');
+    exigerAdmin(user, camp);
+
     if (m === 'PUT' && !action) {
-        saveCamp({ ...validerCamp(await lireJson(req)), id });
+        const modifie = validerCamp(await lireJson(req));
+        if (!user.superAdmin && !modifie.membres.some(x => x.role === 'admin')) {
+            throw new HttpError(400, `${ADMIN_REQUIS} d'enregistrer.`);
+        }
+        saveCamp({ ...modifie, id });
         return json(req, res, 200, getCamp(id));
     }
     if (m === 'DELETE' && !action) {
+        exigerSuperAdmin(user);
         deleteCamp(id);
         return json(req, res, 200, { ok: true });
     }
-    // Envoi immédiat de la prévision du lendemain aux contacts
+    // Envoi immédiat de la prévision du lendemain aux membres
     if (m === 'POST' && action === 'envoyer') {
         const date = getParisDate(1);
         const entry = readHistory().find(e => e.date === date) ?? { date };
@@ -62,39 +139,6 @@ async function routeCamps(req, res, id, action) {
     throw new HttpError(404, 'Introuvable');
 }
 
-// --- Comptes ---
-
-async function routeUsers(req, res, id, user) {
-    if (req.method === 'GET') return json(req, res, 200, users.list());
-    if (req.method === 'POST') {
-        const body = await lireJson(req);
-        const email = texte(body.email, "L'email", 254);
-        if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Email invalide');
-        if (users.byEmail(email)) throw new HttpError(409, 'Ce compte existe déjà');
-        const motDePasse = randomPassword();
-        users.create(email, texte(body.nom, 'Le nom', 80, { requis: false }), hashPassword(motDePasse));
-        return json(req, res, 201, { email, motDePasse });
-    }
-    if (req.method === 'DELETE' && id) {
-        if (Number(id) === user.id) throw new HttpError(400, 'Impossible de supprimer son propre compte');
-        if (!users.delete(Number(id))) throw new HttpError(404, 'Compte introuvable');
-        return json(req, res, 200, { ok: true });
-    }
-    throw new HttpError(404, 'Introuvable');
-}
-
-async function routePassword(req, res, user) {
-    const body = await lireJson(req);
-    if (!checkPassword(user.id, body.actuel)) throw new HttpError(400, 'Mot de passe actuel incorrect');
-    if (String(body.nouveau ?? '').length < MIN_PASSWORD_LENGTH) {
-        throw new HttpError(400, `Le nouveau mot de passe doit faire au moins ${MIN_PASSWORD_LENGTH} caractères`);
-    }
-    users.setPassword(user.id, hashPassword(String(body.nouveau)));
-    // Les autres sessions sont fermées : on reconnecte celle-ci
-    const session = login(user.email, String(body.nouveau));
-    json(req, res, 200, { ok: true }, { 'Set-Cookie': session.cookie });
-}
-
 // --- Aiguillage ---
 
 export async function api(req, res, chemin) {
@@ -103,33 +147,37 @@ export async function api(req, res, chemin) {
 
     if (m === 'POST' && ressource === 'login') return routeLogin(req, res);
     if (m === 'POST' && ressource === 'logout') return json(req, res, 200, { ok: true }, { 'Set-Cookie': logout(req) });
-    if (m === 'GET' && ressource === 'me') return json(req, res, 200, { user: currentUser(req) });
+    if (m === 'GET' && ressource === 'me') return json(req, res, 200, { user: profil(currentUser(req)) });
 
     const user = currentUser(req);
     if (!user) throw new HttpError(401, 'Connexion requise');
 
+    if (ressource === 'mes-camps') return routeMesCamps(req, res, user, id);
+    if (ressource === 'camps') return routeCamps(req, res, user, id, action);
+
     switch (`${m} ${ressource}`) {
         case 'GET status':
+            exigerUnCamp(user);
             return json(req, res, 200, {
                 smtp: smtpConfigure, ...etat, demain: getParisDate(1),
                 intervalle: UPDATE_INTERVAL_MINUTES, saison: [SEASON_START, SEASON_END], heureDebut: START_HOUR
             });
         case 'GET envois':
-            return json(req, res, 200, envois.recents(50));
+            exigerUnCamp(user);
+            return json(req, res, 200, envois.recents(50, user.superAdmin ? null : campsAdmin(user).map(c => c.id)));
         case 'POST passage':
+            exigerSuperAdmin(user);
             await passage({ force: true });
             return json(req, res, 200, etat);
         case 'POST test-mail':
+            exigerUnCamp(user);
+            if (!user.email) throw new HttpError(400, "Votre compte Intranet n'a pas d'e-mail");
             try {
                 await envoyerTest(user.email);
             } catch (e) {
                 throw new HttpError(502, e.message);
             }
             return json(req, res, 200, { ok: true, to: user.email });
-        case 'POST password':
-            return routePassword(req, res, user);
     }
-    if (ressource === 'camps') return routeCamps(req, res, id, action);
-    if (ressource === 'users') return routeUsers(req, res, id, user);
     throw new HttpError(404, 'Introuvable');
 }

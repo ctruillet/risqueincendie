@@ -1,4 +1,4 @@
-// Relevé périodique des prévisions du lendemain, suivi des mails aux contacts des camps
+// Relevé périodique des prévisions du lendemain, suivi des mails aux membres des camps
 import { listCamps } from './db.mjs';
 import { updateHistory, getParisDate, getParisHour } from './history.mjs';
 import { notifierCamps, campActifLe } from './notify.mjs';
@@ -16,7 +16,7 @@ export async function passage({ force = false } = {}) {
     if (etat.enCours) return;
     etat.enCours = true;
     try {
-        const camps = listCamps({ avecContacts: true });
+        const camps = listCamps({ avecMembres: true });
         const demain = getParisDate(1);
         const jourMois = demain.slice(5);
         const enSaison = (jourMois >= SEASON_START && jourMois <= SEASON_END)

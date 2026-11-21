@@ -23,6 +23,9 @@
 
     <header class="barre">
         <a href="./" class="marque"><img src="logo.svg" alt="" width="35" height="32">Nature Environnement</a>
+        <nav id="compte" class="compte" aria-label="Compte">
+            <a href="connexion" class="bouton-barre">Se connecter</a>
+        </nav>
     </header>
 
     <main class="container">
@@ -36,6 +39,17 @@
             <p class="loading">Chargement des camps…</p>
         </div>
     </main>
+
+    <dialog id="dialog-quitter" class="dialogue" aria-labelledby="dialog-quitter-titre">
+        <form method="dialog">
+            <h2 id="dialog-quitter-titre">Vous retirer de ce camp ?</h2>
+            <p id="dialog-quitter-texte"></p>
+            <div class="dialogue-actions">
+                <button value="annuler" class="bouton-contour" autofocus>Annuler</button>
+                <button value="ok" class="bouton-plein danger">Me retirer</button>
+            </div>
+        </form>
+    </dialog>
 
     <footer class="pied">
         <div class="pied-corps">

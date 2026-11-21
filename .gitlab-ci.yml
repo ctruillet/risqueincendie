@@ -1,0 +1,31 @@
+stages:
+  - develop
+  - build
+  - scan
+  - sign
+  - release
+  - deploy
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: $CI_MERGE_REQUEST_DRAFT == "true"
+      when: never
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+include:
+  # Ce composant vérifie le formattage du commit message et automatise la génération du CHANGELOG.md
+  - component: $CI_SERVER_FQDN/sgdf/projets-benevoles/pnb-cicd/semantic-release@v1.4.1
+
+  # Ce composant applique des vérifications de sécurité comme des mots de passe dans les fichiers publiés
+  - component: $CI_SERVER_FQDN/sgdf/projets-benevoles/pnb-cicd/security@v1.4.1
+
+  # Ce composant construit l'image conteneur de l'application
+  - component: $CI_SERVER_FQDN/sgdf/projets-benevoles/pnb-cicd/container@v1.4.1
+    inputs:
+      image_name: ne
+
+  # Ce composant déploie en préproduction et en production
+  # - component: $CI_SERVER_FQDN/sgdf/projets-benevoles/pnb-cicd/deploy@v1.4.1
