@@ -44,13 +44,22 @@ function validerMembre(m) {
     if (!email && !identifiant) throw new HttpError(400, `Indiquer l'e-mail ou le numéro d'adhérent de ${qui}`);
     if (email && !EMAIL_RE.test(email)) throw new HttpError(400, `E-mail invalide : ${email}`);
     if (identifiant && !NUMERO_RE.test(identifiant)) throw new HttpError(400, `Numéro d'adhérent invalide (9 chiffres) : ${identifiant}`);
-    return { nom, email, identifiant, role: m.role === 'admin' ? 'admin' : 'participant' };
+    const jusquAu = m.jusqu_au && /^\d{4}-\d{2}-\d{2}$/.test(m.jusqu_au) ? m.jusqu_au : null;
+    return { nom, email, identifiant, role: m.role === 'admin' ? 'admin' : 'participant', jusqu_au: jusquAu };
 }
 
 const doublon = valeurs => {
     const vues = valeurs.filter(Boolean).map(v => v.toLowerCase());
     return new Set(vues).size !== vues.length;
 };
+
+// Fin d'abonnement choisie par un participant : vide (fin de l'été) ou une date à venir
+export function validerFinAbonnement(valeur, aujourdhui) {
+    if (!valeur) return null;
+    if (!DATE_RE.test(valeur)) throw new HttpError(400, 'Date invalide');
+    if (valeur < aujourdhui) throw new HttpError(400, 'La date est déjà passée');
+    return valeur;
+}
 
 export function validerCamp(body) {
     const titre = texte(body.titre, 'Le titre', 120);

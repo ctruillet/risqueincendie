@@ -3,7 +3,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { DATA_DIR } from './config.mjs';
+import { DATA_DIR, SEASON_END } from './config.mjs';
+import { getParisDate } from './history.mjs';
 
 mkdirSync(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(join(DATA_DIR, 'ne.db'));
@@ -43,10 +44,11 @@ db.exec(`
         PRIMARY KEY (camp_id, cle)
     );
 
-    -- Membres d'un camp, ajoutés par un admin du camp avec leur e-mail et/ou leur identifiant Intranet.
-    -- Tous ceux qui ont un e-mail reçoivent les prévisions pendant les dates du camp.
+    -- Membres d'un camp : ajoutés par un admin du camp (e-mail et/ou identifiant Intranet) ou abonnés
+    -- d'eux-mêmes. Tous ceux qui ont un e-mail reçoivent les prévisions pendant les dates du camp.
     --   admin       : modifie le camp et ses membres
-    --   participant : voit le camp mis en avant sur l'accueil, peut s'en retirer
+    --   participant : voit le camp mis en avant sur l'accueil, peut s'en retirer. Retiré du camp
+    --                 après jusqu_au (inclus), au plus tard à la fin de l'été (fin de SEASON).
     CREATE TABLE IF NOT EXISTS membres (
         id          INTEGER PRIMARY KEY,
         camp_id     TEXT NOT NULL REFERENCES camps(id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -54,6 +56,7 @@ db.exec(`
         nom         TEXT NOT NULL DEFAULT '',
         email       TEXT COLLATE NOCASE,
         identifiant TEXT COLLATE NOCASE,
+        jusqu_au    TEXT,               -- AAAA-MM-JJ, inclus ; participants seulement
         CHECK (email IS NOT NULL OR identifiant IS NOT NULL),
         UNIQUE (camp_id, email),
         UNIQUE (camp_id, identifiant)
@@ -90,6 +93,20 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS envois_camp_date ON envois (camp_id, date);
 `);
 
+// Migration : date de fin d'abonnement des participants
+if (!db.prepare("SELECT 1 FROM pragma_table_info('membres') WHERE name = 'jusqu_au'").get()) {
+    db.exec('ALTER TABLE membres ADD COLUMN jusqu_au TEXT');
+}
+
+// Dernier jour de l'été en cours (ou du prochain, si celui de cette année est passé)
+export function finSaison(aujourdhui = getParisDate(0)) {
+    const annee = Number(aujourdhui.slice(0, 4)) + (aujourdhui.slice(5) > SEASON_END ? 1 : 0);
+    return `${annee}-${SEASON_END}`;
+}
+
+// Fin d'abonnement d'un participant : la date demandée, au plus tard la fin de l'été
+const finAbonnement = jusquAu => (jusquAu && jusquAu < finSaison() ? jusquAu : finSaison());
+
 // Copie cohérente de la base, même pendant que le serveur tourne
 export function backupTo(path) {
     db.prepare('VACUUM INTO ?').run(path);
@@ -104,6 +121,7 @@ if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'con
     `);
     console.log('👥 Contacts des camps repris comme participants.');
 }
+db.prepare("UPDATE membres SET jusqu_au = ? WHERE role = 'participant' AND jusqu_au IS NULL").run(finSaison());
 
 function transaction(fn) {
     db.exec('BEGIN');
@@ -138,7 +156,7 @@ export function listCamps({ avecMembres = false } = {}) {
         FROM camp_zones cz JOIN zones z ON z.cle = cz.cle
         ORDER BY cz.position`).all();
     const membres = avecMembres
-        ? db.prepare(`SELECT id, camp_id, role, nom, email, identifiant FROM membres
+        ? db.prepare(`SELECT id, camp_id, role, nom, email, identifiant, jusqu_au FROM membres
                       ORDER BY role = 'admin' DESC, id`).all()
         : [];
     return camps.map(camp => ({
@@ -175,8 +193,9 @@ export function saveCamp(camp) {
         });
         db.prepare('DELETE FROM membres WHERE camp_id = ?').run(camp.id);
         for (const m of camp.membres ?? []) {
-            db.prepare('INSERT INTO membres (camp_id, role, nom, email, identifiant) VALUES (?, ?, ?, ?, ?)')
-                .run(camp.id, m.role, m.nom ?? '', m.email ?? null, m.identifiant ?? null);
+            db.prepare('INSERT INTO membres (camp_id, role, nom, email, identifiant, jusqu_au) VALUES (?, ?, ?, ?, ?, ?)')
+                .run(camp.id, m.role, m.nom ?? '', m.email ?? null, m.identifiant ?? null,
+                    m.role === 'participant' ? finAbonnement(m.jusqu_au) : null);
         }
     });
 }
@@ -236,14 +255,31 @@ export const users = {
     })
 };
 
+const lui = user => ({ $identifiant: user.identifiant, $email: user.email ?? null });
+
 export const membres = {
-    // Camps de l'utilisateur et son rôle dans chacun : { campId: 'admin' | 'participant' }
-    roles: user => Object.fromEntries(db.prepare(`
-        SELECT m.camp_id, MAX(m.role = 'admin') AS admin FROM membres m WHERE ${EST_LUI} GROUP BY m.camp_id`)
-        .all({ $identifiant: user.identifiant, $email: user.email ?? null })
-        .map(r => [r.camp_id, r.admin ? 'admin' : 'participant'])),
+    // Camps de l'utilisateur : [{ id, role: 'admin' | 'participant', jusqu_au }]
+    miens: user => db.prepare(`
+        SELECT m.camp_id AS id, CASE WHEN MAX(m.role = 'admin') THEN 'admin' ELSE 'participant' END AS role,
+               CASE WHEN MAX(m.role = 'admin') THEN NULL ELSE MAX(m.jusqu_au) END AS jusqu_au
+        FROM membres m WHERE ${EST_LUI} GROUP BY m.camp_id`).all(lui(user)),
+    // { campId: 'admin' | 'participant' }
+    roles: user => Object.fromEntries(membres.miens(user).map(c => [c.id, c.role])),
+    // Abonnement de l'utilisateur comme participant (ou nouvelle date de fin s'il l'est déjà)
+    abonner: (campId, user, jusquAu) => transaction(() => {
+        const fin = finAbonnement(jusquAu);
+        const { changes } = db.prepare(`UPDATE membres AS m SET jusqu_au = $fin
+            WHERE m.camp_id = $camp AND m.role = 'participant' AND ${EST_LUI}`)
+            .run({ ...lui(user), $camp: campId, $fin: fin });
+        if (!changes) {
+            db.prepare(`INSERT INTO membres (camp_id, role, nom, email, identifiant, jusqu_au)
+                        VALUES (?, 'participant', ?, ?, ?, ?)`)
+                .run(campId, user.nom ?? '', user.email ?? null, user.identifiant, fin);
+        }
+        return fin;
+    }),
     quitter: (campId, user) => db.prepare(`DELETE FROM membres AS m WHERE m.camp_id = $camp AND ${EST_LUI}`)
-        .run({ $camp: campId, $identifiant: user.identifiant, $email: user.email ?? null }).changes > 0,
+        .run({ ...lui(user), $camp: campId }).changes > 0,
     nbAdmins: campId => db.prepare("SELECT COUNT(*) AS n FROM membres WHERE camp_id = ? AND role = 'admin'").get(campId).n
 };
 
@@ -262,9 +298,12 @@ export const sessions = {
 export function purgerAnciennesDonnees() {
     const envoisSupprimes = db.prepare("DELETE FROM envois WHERE sent_at < datetime('now', '-1 year')").run().changes;
     const comptesSupprimes = db.prepare("DELETE FROM users WHERE derniere_connexion < datetime('now', '-3 years')").run().changes;
+    // Participants arrivés au bout de leur abonnement (au plus tard à la fin de l'été)
+    const participantsRetires = db.prepare("DELETE FROM membres WHERE role = 'participant' AND jusqu_au < ?")
+        .run(getParisDate(0)).changes;
     db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
-    if (envoisSupprimes || comptesSupprimes) {
-        console.log(`🧹 Purge : ${envoisSupprimes} mail(s) du journal, ${comptesSupprimes} compte(s) inactif(s).`);
+    if (envoisSupprimes || comptesSupprimes || participantsRetires) {
+        console.log(`🧹 Purge : ${envoisSupprimes} mail(s) du journal, ${comptesSupprimes} compte(s) inactif(s), ${participantsRetires} participant(s) en fin d'abonnement.`);
     }
 }
 

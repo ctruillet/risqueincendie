@@ -3,13 +3,14 @@
 //   responsable du site (structure STRUCTURE_RESPONSABLE) : tout, y compris créer et supprimer les camps
 //   admin d'un camp       : modifie ce camp (dates, massifs, membres) et envoie ses mails
 //   participant d'un camp : voit ce camp dans « Mes camps » et peut s'en retirer
-import { listCamps, getCamp, saveCamp, deleteCamp, membres, envois } from './db.mjs';
+//   tout compte           : s'abonne à un camp comme participant, jusqu'à une date ou jusqu'à la fin de l'été
+import { listCamps, getCamp, saveCamp, deleteCamp, membres, envois, finSaison } from './db.mjs';
 import { login, logout, currentUser, tropDeTentatives, noterEchec } from './auth.mjs';
 import { readHistory, getParisDate } from './history.mjs';
 import { envoyerCamp, envoyerTest, smtpConfigure } from './notify.mjs';
 import { passage, etat } from './scheduler.mjs';
 import { HttpError, json, lireJson, ipClient } from './http.mjs';
-import { validerCamp, slug } from './validation.mjs';
+import { validerCamp, validerFinAbonnement, slug } from './validation.mjs';
 import { UPDATE_INTERVAL_MINUTES, SEASON_START, SEASON_END, START_HOUR } from './config.mjs';
 
 // --- Droits ---
@@ -81,9 +82,17 @@ const profil = user => user && {
 
 async function routeMesCamps(req, res, user, id) {
     const roles = rolesDe(user);
-    // Camps dont on est membre : mis en valeur sur l'accueil
+    // Camps dont on est membre (mis en valeur sur l'accueil) et fin de l'été (fin des abonnements)
     if (req.method === 'GET' && !id) {
-        return json(req, res, 200, Object.entries(roles).map(([campId, role]) => ({ id: campId, role })));
+        return json(req, res, 200, { camps: membres.miens(user), finSaison: finSaison() });
+    }
+    // S'abonner à un camp, ou changer la date de fin de son abonnement
+    if (req.method === 'POST' && id) {
+        if (!getCamp(id)) throw new HttpError(404, 'Camp introuvable');
+        if (roles[id] === 'admin') throw new HttpError(400, 'Vous êtes déjà admin de ce camp');
+        const jusquAu = membres.abonner(id, user, validerFinAbonnement((await lireJson(req)).jusqu_au, getParisDate(0)));
+        console.log(`🔔 ${user.identifiant} abonné au camp ${id} jusqu'au ${jusquAu}`);
+        return json(req, res, 200, { ok: true, jusqu_au: jusquAu });
     }
     // Se retirer d'un camp
     if (req.method === 'DELETE' && id) {

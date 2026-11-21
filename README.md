@@ -50,9 +50,11 @@ Aucun mot de passe ni jeton n'est conservé. Le compte est créé à la premièr
 |---|---|---|
 | Responsable du site | adhérents de la structure **988220500** (fonction principale ou secondaire) | tout : créer et supprimer les camps, en nommer les admins, lancer un relevé, tester l'envoi des mails |
 | Admin d'un camp | membre du camp avec le rôle « Admin » | modifier ce camp (nom, dates, massifs, membres), envoyer la prévision tout de suite |
-| Participant d'un camp | membre du camp avec le rôle « Participant » | voir le camp dans « Mes camps », s'en retirer (après confirmation) |
+| Participant d'un camp | ajouté par un admin, ou abonné de lui-même | voir le camp dans « Mes camps », s'en retirer (après confirmation) |
+| Toute personne connectée | | s'abonner à un camp comme participant, jusqu'à une date choisie ou jusqu'à la fin de l'été |
 
 - Un membre est ajouté avec son **e-mail** ou son **numéro d'adhérent** (9 chiffres). À sa connexion, il est reconnu par l'un ou l'autre. Son nom et l'information manquante sont alors complétés depuis l'Intranet.
+- Un participant est retiré du camp après sa date de fin d'abonnement. **À la fin de l'été** (dernier jour de `SEASON`, le 30 septembre par défaut), tous les participants sont retirés. Les admins restent.
 - Un camp garde toujours au moins un admin : le dernier admin ne peut ni se retirer ni se rétrograder. Le responsable du site, lui, le peut.
 
 ## Démarrage rapide en local
@@ -213,7 +215,7 @@ Les données viennent de [risque-prevention-incendie.fr](https://www.risque-prev
 - **Droits** : vérifiés par le serveur à chaque requête. Les dates d'un camp ne sont montrées qu'à ses membres, et les coordonnées des membres qu'à ses admins. `/camps.json` ne publie que le nom et les massifs.
 - **En-têtes** : Content-Security-Policy stricte sur toutes les pages (aucun script ni style en ligne, aucun site tiers), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`. HSTS est ajouté par le reverse proxy.
 - **Requêtes** : JSON obligatoire et contrôle de l'origine pour toute modification (protection CSRF), corps limité à 200 Ko, chemins de fichiers contrôlés, données saisies validées (caractères de contrôle retirés), envoi manuel des mails limité à un par minute et par camp.
-- **Conservation** : comptes supprimés après 3 ans sans connexion, journal des mails après 1 an (purge quotidienne automatique), sessions expirées purgées.
+- **Conservation** : participants retirés à la fin de leur abonnement (au plus tard à la fin de l'été), comptes supprimés après 3 ans sans connexion, journal des mails après 1 an (purge quotidienne automatique), sessions expirées purgées.
 - **Exploitation** : conteneur sans root, secrets uniquement dans `.env` (exclu du dépôt et de l'image), dépendances fixées à une version exacte et suivies par Renovate, recherche de secrets avant chaque commit.
 
 Le détail affiché aux utilisateurs se trouve sur la page `/donnees-personnelles`.

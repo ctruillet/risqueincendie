@@ -34,6 +34,17 @@
         </div>
     </main>
 
+    <!-- Abonnement à un camp (personne connectée) : composants sgdf chargés au premier clic -->
+    <sgdf-dialog id="abonnement">
+        <p id="abonnement-texte"></p>
+        <sgdf-date-time-picker id="abonnement-date" label="Jusqu'au (facultatif)"></sgdf-date-time-picker>
+        <p id="abonnement-aide" class="aide-dialog"></p>
+        <sgdf-button slot="footer" id="abonnement-retirer" variant="danger" appearance="text" hidden>Me désabonner</sgdf-button>
+        <sgdf-button slot="footer" id="abonnement-annuler" appearance="outlined">Annuler</sgdf-button>
+        <sgdf-button slot="footer" id="abonnement-ok" variant="primary">M'abonner</sgdf-button>
+    </sgdf-dialog>
+    <sgdf-toast id="toast"></sgdf-toast>
+
     <!-- pied-de-page -->
 
     <script src="js/common.js" defer></script>

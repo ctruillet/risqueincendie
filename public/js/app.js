@@ -39,12 +39,12 @@ const ICONE_CALENDRIER = '<svg viewBox="0 0 640 640" aria-hidden="true"><path fi
 async function chargerCompte() {
     try {
         const { user } = await fetchJson('api/me');
-        if (!user) return { user: null, mesCamps: new Set() };
-        const camps = await fetchJson('api/mes-camps');
-        return { user, mesCamps: new Set(camps.map(c => c.id)) };
+        if (!user) return { user: null, mesCamps: new Map() };
+        const { camps, finSaison } = await fetchJson('api/mes-camps');
+        return { user, finSaison, mesCamps: new Map(camps.map(c => [c.id, c])) };
     } catch {
         // Hors ligne ou serveur indisponible : la page reste utilisable sans compte
-        return { user: null, mesCamps: new Set() };
+        return { user: null, mesCamps: new Map() };
     }
 }
 
@@ -61,7 +61,8 @@ function afficherCompte(user) {
     });
 }
 
-function genererStructureCamp(camp, labels, estMien = false) {
+function genererStructureCamp(camp, labels, compte) {
+    const estMien = compte.mesCamps.has(camp.id);
     const rowsHtml = camp.zones.map(zone => {
         const cle = escapeHtml(zone.cle);
         return `
@@ -91,8 +92,115 @@ function genererStructureCamp(camp, labels, estMien = false) {
         <section class="carte camp${estMien ? ' camp-mien' : ''}">
             <h2 class="carte-titre"><a href="${lienEte}">${escapeHtml(camp.titre)}</a>${estMien ? '<span class="visually-hidden"> (votre camp)</span>' : ''}</h2>
             <div class="rows-container">${rowsHtml}</div>
-            <a class="lien-action" href="${lienEte}">${ICONE_CALENDRIER}Historique de l'été</a>
+            <div class="liens-camp">${liensCamp(camp, compte)}</div>
         </section>`;
+}
+
+const finTexte = (jusquAu, finSaison) => jusquAu === finSaison
+    ? 'jusqu\'à la fin de l\'été' : `jusqu'au ${dateLongue(jusquAu)}`;
+
+// Historique de l'été, puis selon la personne connectée : « S'abonner aux mails » ou « Mails jusqu'au … · modifier »
+function liensCamp(camp, { user, mesCamps, finSaison }) {
+    const lienEte = `<a class="lien-action" href="camp.html?camp=${encodeURIComponent(camp.id)}">${ICONE_CALENDRIER}Historique de l'été</a>`;
+    const mien = mesCamps.get(camp.id);
+    // Discret, à droite : l'essentiel de la carte reste le risque incendie
+    const bouton = texte => `<button type="button" class="lien-discret" data-abonner="${escapeHtml(camp.id)}">${texte}</button>`;
+    if (!user || (!mien && camp.termine)) return lienEte;
+    if (!mien) return `${lienEte}<span class="abonnement">${bouton('S\'abonner aux mails')}</span>`;
+    if (mien.role !== 'participant') return lienEte;
+    return `${lienEte}<span class="abonnement">Mails ${finTexte(mien.jusqu_au, finSaison)} · ${bouton('modifier')}</span>`;
+}
+
+// --- Abonnement à un camp : fenêtre sgdf pour choisir la date de fin (facultative) ---
+
+const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year: 'numeric' });
+
+// Ouvre la fenêtre. Résout { date } ('' = fin de l'été), { retirer: true }, ou null si annulé.
+// mien : abonnement en cours (date préremplie, bouton « Me désabonner »)
+async function demanderAbonnement(camp, mien, { user, finSaison }) {
+    await import('/ui/admin.js');
+    await customElements.whenDefined('sgdf-dialog');
+    const $ = id => document.getElementById(id);
+    const dialog = $('abonnement');
+    const date = $('abonnement-date');
+    dialog.title = camp.titre;
+    $('abonnement-texte').textContent = 'Chaque soir du camp, un mail avec les accès aux massifs du lendemain.';
+    $('abonnement-aide').textContent = user.email
+        ? `Sans date : jusqu'à la fin de l'été (${dateLongue(finSaison)}).`
+        : "Votre compte Intranet n'a pas d'e-mail : vous ne recevrez pas les mails.";
+    date.value = mien && mien.jusqu_au !== finSaison ? mien.jusqu_au : '';
+    date.min = getIsoDate(0);
+    date.max = finSaison;
+    $('abonnement-ok').textContent = mien ? 'Enregistrer' : 'M\'abonner';
+    $('abonnement-retirer').hidden = !mien;
+    dialog.open = true;
+    return new Promise(resolve => {
+        let reponse = null;
+        const boutons = {
+            'abonnement-ok': () => { reponse = { date: date.value || '' }; },
+            'abonnement-retirer': () => { reponse = { retirer: true }; },
+            'abonnement-annuler': () => {}
+        };
+        const clic = e => {
+            const id = Object.keys(boutons).find(i => e.target.closest(`#${i}`));
+            if (!id) return;
+            boutons[id]();
+            dialog.open = false;
+        };
+        dialog.addEventListener('click', clic);
+        // Le calendrier du champ date émet aussi sgdf-after-hide : seul celui de la fenêtre compte
+        const fin = e => {
+            if (e.target !== dialog) return;
+            dialog.removeEventListener('sgdf-after-hide', fin);
+            dialog.removeEventListener('click', clic);
+            resolve(reponse);
+        };
+        dialog.addEventListener('sgdf-after-hide', fin);
+    });
+}
+
+function notifier(texte, erreur = false) {
+    document.getElementById('toast').create(texte, erreur
+        ? { variant: 'danger', title: 'Erreur', duration: 8000 }
+        : { variant: 'success', title: 'C\'est fait' });
+}
+
+async function appelApi(chemin, method, body) {
+    const res = await fetch(`api/${chemin}`, {
+        method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.erreur ?? `Erreur ${res.status}`);
+    return data;
+}
+
+function activerAbonnement(camps, compte) {
+    document.getElementById('dashboard-container').addEventListener('click', async e => {
+        const bouton = e.target.closest('[data-abonner]');
+        if (!bouton) return;
+        const camp = camps.find(c => c.id === bouton.dataset.abonner);
+        const mien = compte.mesCamps.get(camp.id);
+        const choix = await demanderAbonnement(camp, mien, compte);
+        if (!choix) return;
+        const chemin = `mes-camps/${encodeURIComponent(camp.id)}`;
+        try {
+            if (choix.retirer) {
+                await appelApi(chemin, 'DELETE');
+                compte.mesCamps.delete(camp.id);
+                notifier('Désabonné.');
+            } else {
+                const { jusqu_au } = await appelApi(chemin, 'POST', { jusqu_au: choix.date || null });
+                compte.mesCamps.set(camp.id, { id: camp.id, role: 'participant', jusqu_au });
+                notifier(`Abonné ${finTexte(jusqu_au, compte.finSaison)}.`);
+            }
+        } catch (err) {
+            return notifier(err.message, true);
+        }
+        // Contour « mon camp » et liens mis à jour sur place
+        const carte = bouton.closest('.camp');
+        carte.classList.toggle('camp-mien', compte.mesCamps.has(camp.id));
+        carte.querySelector('.liens-camp').innerHTML = liensCamp(camp, compte);
+    });
 }
 
 function setTitle(el, config) {
@@ -189,7 +297,8 @@ async function init() {
 
     const zones = camps.flatMap(c => c.zones);
     const historyByDate = new Map(history.map(item => [item.date, item]));
-    container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels, mesCamps.has(camp.id))).join('');
+    container.innerHTML = camps.map(camp => genererStructureCamp(camp, labels, compte)).join('');
+    if (compte.user) activerAbonnement(camps, compte);
 
     // Statuts courants par clé de zone, initialisés depuis l'historique
     const statuts = {

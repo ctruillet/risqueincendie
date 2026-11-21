@@ -238,6 +238,16 @@ body {
 }
 
 .lien-action:hover { text-decoration: underline; }
+.liens-camp { display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; }
+/* Abonnement aux mails : petite ligne discrète en bas à droite de la carte */
+.abonnement { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); }
+.lien-discret { padding: 0; border: none; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.lien-discret:hover { color: var(--text-color); }
+
+/* Fenêtre d'abonnement : invisible tant que les composants sgdf ne sont pas chargés */
+sgdf-dialog:not(:defined), sgdf-toast:not(:defined) { display: none; }
+#abonnement p { margin: 0 0 12px; }
+.aide-dialog { font-size: 0.85rem; color: var(--text-muted); }
 .lien-action svg { width: 1em; height: 1em; flex-shrink: 0; }
 
 /* Onglets (rendu sgdf-tab-group) */

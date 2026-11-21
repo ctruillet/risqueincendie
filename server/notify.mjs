@@ -54,7 +54,7 @@ function composerMail(camp, date, entry, { miseAJour = false } = {}) {
     const jour = formatDate(date);
     const lien = PUBLIC_URL ? `${PUBLIC_URL}/?date=${date}` : '';
     const periode = camp.debut ? ` (du ${formatDate(camp.debut)} au ${formatDate(camp.fin)})` : '';
-    const pourquoi = `Vous recevez ce mail car vous êtes membre du camp « ${camp.titre} »${periode}.`;
+    const pourquoi = `Vous recevez ce mail car vous êtes membre ou abonné du camp « ${camp.titre} »${periode}.`;
     const desinscription = PUBLIC_URL
         ? `Pour ne plus les recevoir, connectez-vous sur ${PUBLIC_URL} et retirez-vous du camp, ou répondez simplement à ce mail.`
         : 'Pour ne plus recevoir ces mails ou faire supprimer vos coordonnées, répondez simplement à ce mail.';
@@ -86,13 +86,14 @@ ${lien ? `<p><a href="${escapeHtml(lien)}" style="color:#003a5d">Voir le détail
     return { subject, text, html, signature: JSON.stringify(lignes.map(l => [l.label, l.status])), complet: lignes.every(l => l.status !== 'unknown') };
 }
 
-// E-mails des membres du camp (admins et participants), sans doublon
-const destinatairesDe = camp => [...new Map(camp.membres.filter(m => m.email)
+// E-mails des membres du camp (admins, et participants abonnés jusqu'à cette date au moins), sans doublon
+const destinatairesDe = (camp, date) => [...new Map(camp.membres
+    .filter(m => m.email && (m.role === 'admin' || !m.jusqu_au || m.jusqu_au >= date))
     .map(m => [m.email.toLowerCase(), m.email])).values()];
 
 // Envoie le mail d'un camp à tous ses membres ayant un e-mail et l'enregistre dans le journal
 export async function envoyerCamp(camp, date, entry, options = {}) {
-    const destinataires = destinatairesDe(camp);
+    const destinataires = destinatairesDe(camp, date);
     if (destinataires.length === 0) return { ok: false, erreur: 'Aucun membre avec un e-mail' };
     const mail = composerMail(camp, date, entry, options);
     const erreurs = [];
@@ -116,7 +117,7 @@ export async function envoyerCamp(camp, date, entry, options = {}) {
 export async function notifierCamps(camps, entry) {
     for (const camp of camps) {
         if (!campActifLe(camp, entry.date) || camp.zones.length === 0) continue;
-        if (destinatairesDe(camp).length === 0) continue;
+        if (destinatairesDe(camp, entry.date).length === 0) continue;
 
         const { signature, complet } = composerMail(camp, entry.date, entry);
         const dernier = envois.dernierReussi(camp.id, entry.date);

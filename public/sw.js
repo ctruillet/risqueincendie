@@ -1,4 +1,4 @@
-const CACHE_NAME = 'risqueincendie-v15';
+const CACHE_NAME = 'risqueincendie-v19';
 const ASSETS = [
   './',
   './index.html',

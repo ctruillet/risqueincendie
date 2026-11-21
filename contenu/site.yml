@@ -59,7 +59,7 @@ pages:
       - titre: Données conservées
         texte: |
           - **Compte** (créé à la première connexion) : numéro d'adhérent, nom, e-mail, date de dernière connexion, transmis par l'Intranet SGDF. Le mot de passe est vérifié par l'Intranet et n'est jamais conservé.
-          - **Membres des camps** : e-mail ou numéro d'adhérent, nom et rôle, saisis par les admins du camp.
+          - **Membres des camps** : e-mail ou numéro d'adhérent, nom, rôle et date de fin d'abonnement, saisis par les admins du camp ou par la personne qui s'abonne.
           - **Camps** : nom, dates et massifs. Les dates et les membres ne sont visibles que par les membres du camp et le responsable du site.
           - **Journal des mails** : date, camp et adresses des destinataires de chaque envoi.
       - titre: Pourquoi
@@ -68,7 +68,8 @@ pages:
       - titre: Durée de conservation
         texte: |
           - Comptes : supprimés après 3 ans sans connexion.
-          - Membres : jusqu'à leur retrait du camp ou la suppression du camp.
+          - Participants : jusqu'à la date de fin d'abonnement choisie, et au plus tard la fin de l'été (tous les participants sont alors retirés des camps).
+          - Admins des camps : jusqu'à leur retrait du camp ou la suppression du camp.
           - Journal des mails : 1 an.
       - titre: Destinataires
         texte: |

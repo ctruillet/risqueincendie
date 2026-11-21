@@ -1,11 +1,12 @@
 // Page de gestion « Mes camps » : camps (dates, massifs, membres) et mails envoyés.
 // Responsable du site : tous les camps, création et suppression. Admin d'un camp : modifie ses camps.
-// Participant : voit ses camps et peut s'en retirer.
+// Participant : voit ses camps et peut s'en retirer. On s'abonne à un camp depuis l'accueil.
 // Les composants sgdf-* viennent du design system SGDF (ui/admin.js, chargé après la connexion).
 const $ = sel => document.querySelector(sel);
 
 let massifs = {};
 let camps = [];
+let finSaison = '';        // fin de l'été : fin des abonnements
 let utilisateur = null;
 let campEdite = null;      // null = nouveau camp
 let membresEdites = [];    // membres du camp en cours de modification
@@ -137,14 +138,21 @@ function boutonsCamp(camp) {
     ].filter(Boolean).join('');
 }
 
+// « abonné jusqu'au … » ; la fin de l'été est nommée comme telle
+const finAbonnement = jusquAu => jusquAu
+    ? `jusqu'au ${dateLongue(jusquAu)}${jusquAu === finSaison ? ' (fin de l\'été)' : ''}`
+    : 'jusqu\'à la fin de l\'été';
+
 function afficherCamps() {
     const liste = $('#liste-camps');
-    liste.innerHTML = camps.length === 0 ? '<p class="vide">Aucun camp pour l\'instant.</p>' : camps.map(camp => `
+    liste.innerHTML = camps.length === 0
+        ? '<p class="vide">Vous n\'êtes membre d\'aucun camp pour l\'instant. Abonnez-vous à un camp depuis l\'accueil, ou demandez à un admin de vous ajouter.</p>'
+        : camps.map(camp => `
         <sgdf-card class="camp-item" data-id="${escapeHtml(camp.id)}">
             <h3 slot="header" class="camp-titre">${escapeHtml(camp.titre)}</h3>
             ${etiquetteCamp(camp)}
             <dl class="camp-infos">
-                ${camp.membre ? `<dt>Mon rôle</dt><dd>${camp.role === 'admin' ? 'Admin' : 'Participant'}</dd>` : ''}
+                ${camp.membre ? `<dt>Mon rôle</dt><dd>${camp.role === 'admin' ? 'Admin' : `Participant, ${finAbonnement(camp.jusqu_au)}`}</dd>` : ''}
                 <dt>Dates</dt><dd>${camp.debut ? `du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'pas encore fixées'}</dd>
                 <dt>Massifs</dt><dd>${camp.zones.map(z => escapeHtml(z.label)).join(', ')}</dd>
                 <dt>Admins</dt><dd>${listeNoms(camp.membres, 'admin')}</dd>
@@ -155,9 +163,10 @@ function afficherCamps() {
 }
 
 async function chargerCamps() {
-    camps = await api('camps');
-    $('#vue-aucun').hidden = camps.length > 0 || utilisateur.superAdmin;
-    $('#vue-app').hidden = !$('#vue-aucun').hidden;
+    const [visibles, mesCamps] = await Promise.all([api('camps'), api('mes-camps')]);
+    finSaison = mesCamps.finSaison;
+    const miens = new Map(mesCamps.camps.map(c => [c.id, c]));
+    camps = visibles.map(c => ({ ...c, jusqu_au: miens.get(c.id)?.jusqu_au ?? null }));
     afficherCamps();
 }
 
@@ -249,9 +258,10 @@ function afficherMembres() {
     $('#membres').innerHTML = membresEdites.length === 0
         ? '<li class="vide">Aucun membre pour l\'instant.</li>'
         : membresEdites.map((m, i) => {
-            const details = m.nom
-                ? [m.email, m.identifiant && `n° ${m.identifiant}`].filter(Boolean).join(' · ')
-                : 'Pas encore connecté';
+            const details = [
+                ...(m.nom ? [m.email, m.identifiant && `n° ${m.identifiant}`] : ['Pas encore connecté']),
+                m.role === 'participant' && m.jusqu_au && finAbonnement(m.jusqu_au)
+            ].filter(Boolean).join(' · ');
             return `
             <li class="membre" data-i="${i}">
                 <span class="membre-qui"><strong>${escapeHtml(nomMembre(m))}</strong><small>${escapeHtml(details)}</small></span>
@@ -354,7 +364,7 @@ $('#form-camp').addEventListener('submit', async e => {
         zones: [...document.querySelectorAll('#zones .zone-ligne')].map(l => ({
             dept: valeur(l, 'dept'), id_massif: valeur(l, 'id_massif'), label: valeur(l, 'label')
         })),
-        membres: membresEdites.map(({ nom, email, identifiant, role }) => ({ nom, email, identifiant, role }))
+        membres: membresEdites.map(({ nom, email, identifiant, role, jusqu_au }) => ({ nom, email, identifiant, role, jusqu_au }))
     };
     const bouton = form.querySelector('sgdf-button[submit]');
     bouton.loading = true;
@@ -414,6 +424,7 @@ async function demarrer() {
     $('#onglet-envois').hidden = !user.admin;
     massifs = await fetchJson('massifs.json');
     await Promise.all([chargerCamps(), chargerStatus()]);
+    $('#vue-app').hidden = false;
 }
 
 demarrer().catch(e => notifier(e.message, { erreur: true }));
