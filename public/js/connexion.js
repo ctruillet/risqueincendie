@@ -5,7 +5,7 @@ const erreur = form.querySelector('.form-error');
 // Seulement une adresse de ce site (jamais « //autre-site »)
 function pageDeRetour() {
     const retour = new URLSearchParams(location.search).get('retour') ?? '';
-    return /^\/(?!\/)/.test(retour) ? retour : '/';
+    return /^\/(?![\/\\])/.test(retour) ? retour : '/';
 }
 
 function afficherErreur(texte) {
