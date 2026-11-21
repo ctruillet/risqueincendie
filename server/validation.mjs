@@ -32,8 +32,8 @@ function validerZone(z) {
     return { dept, id_massif: idMassif, label };
 }
 
-// Identifiant Intranet (numéro d'adhérent) : chiffres, lettres et quelques signes
-const IDENTIFIANT_RE = /^[\p{L}\p{N}._@-]{1,60}$/u;
+// Numéro d'adhérent SGDF : 9 chiffres
+const NUMERO_RE = /^\d{9}$/;
 
 function validerMembre(m) {
     const nom = texte(m.nom, 'Le nom du membre', 80, { requis: false });
@@ -42,7 +42,7 @@ function validerMembre(m) {
     const identifiant = texte(m.identifiant, `Le numéro d'adhérent de ${qui}`, 60, { requis: false }) || null;
     if (!email && !identifiant) throw new HttpError(400, `Indiquer l'e-mail ou le numéro d'adhérent de ${qui}`);
     if (email && !EMAIL_RE.test(email)) throw new HttpError(400, `E-mail invalide : ${email}`);
-    if (identifiant && !IDENTIFIANT_RE.test(identifiant)) throw new HttpError(400, `Numéro d'adhérent invalide : ${identifiant}`);
+    if (identifiant && !NUMERO_RE.test(identifiant)) throw new HttpError(400, `Numéro d'adhérent invalide (9 chiffres) : ${identifiant}`);
     return { nom, email, identifiant, role: m.role === 'admin' ? 'admin' : 'participant' };
 }
 

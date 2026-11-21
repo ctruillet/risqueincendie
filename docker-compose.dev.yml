@@ -1,6 +1,6 @@
 # Environnement de DÉVELOPPEMENT, sans .env :
 #   - le site (même image qu'en production) ;
-#   - un Keycloak qui simule l'Intranet SGDF (comptes de test dans keycloak/sgdf_local-realm.json) ;
+#   - un Keycloak et une API qui simulent l'Intranet SGDF (comptes de test dans dev/sgdf_local-realm.json) ;
 #   - Mailpit, une boîte mail de test qui reçoit tous les mails envoyés.
 #
 #   docker compose -f docker-compose.dev.yml up -d --build
@@ -23,7 +23,7 @@ services:
       INTRANET_REALM: sgdf_local
       INTRANET_CLIENT_ID: ne-local
       INTRANET_CLIENT_SECRET: secret-de-developpement-local # gitleaks:allow (Keycloak local uniquement)
-      SUPER_ADMINS: "100000001"
+      INTRANET_API_URL: http://intranet-api:8080
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_STARTTLS: "0"
@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      intranet-api:
+        condition: service_started
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
@@ -45,13 +47,19 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin # gitleaks:allow (Keycloak local uniquement)
     volumes:
-      - ./keycloak/sgdf_local-realm.json:/opt/keycloak/data/import/sgdf_local-realm.json:ro
+      - ./dev/sgdf_local-realm.json:/opt/keycloak/data/import/sgdf_local-realm.json:ro
     healthcheck:
       # Pas de curl dans l'image Keycloak : requête HTTP minimale avec bash
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 5s
       timeout: 5s
       retries: 30
+
+  intranet-api:
+    image: node:24-alpine
+    command: ["node", "/dev-intranet/intranet-api.mjs"]
+    volumes:
+      - ./dev:/dev-intranet:ro
 
   mailpit:
     image: axllent/mailpit:v1.27

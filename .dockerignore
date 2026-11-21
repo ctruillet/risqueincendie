@@ -11,8 +11,7 @@ node_modules
 data
 backups
 public/ui
-keycloak
-target
+dev
 .gitlab-ci.yml
 .pre-commit-config.yaml
 renovate.json

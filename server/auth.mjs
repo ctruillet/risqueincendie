@@ -1,7 +1,7 @@
 // Connexion par l'Intranet, sessions par cookie, rôles et limitation des tentatives de connexion
 import { randomBytes, createHash } from 'node:crypto';
 import { users, sessions } from './db.mjs';
-import { COOKIE_SECURE, SUPER_ADMINS } from './config.mjs';
+import { COOKIE_SECURE } from './config.mjs';
 import { verifierIntranet } from './intranet.mjs';
 
 const SESSION_DAYS = 30;
@@ -17,10 +17,6 @@ function parseCookies(header = '') {
 function cookie(value, maxAge) {
     return `${COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${COOKIE_SECURE ? '; Secure' : ''}`;
 }
-
-// Responsable du site : son identifiant Intranet ou son e-mail est dans SUPER_ADMINS
-export const estSuperAdmin = user => Boolean(user)
-    && (SUPER_ADMINS.has(user.identifiant.toLowerCase()) || (Boolean(user.email) && SUPER_ADMINS.has(user.email.toLowerCase())));
 
 // Retourne { cookie } si l'Intranet accepte les identifiants, sinon null
 export async function login(identifiant, motDePasse) {
@@ -47,7 +43,7 @@ export function logout(req) {
 export function currentUser(req) {
     const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
     const user = token ? sessions.user(sha256(token)) : null;
-    return user ? { ...user, superAdmin: estSuperAdmin(user) } : null;
+    return user ? { ...user, superAdmin: user.responsable === 1 } : null;
 }
 
 // 10 tentatives ratées par adresse IP et par quart d'heure

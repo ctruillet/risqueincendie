@@ -11,7 +11,7 @@ const db = new DatabaseSync(join(DATA_DIR, 'ne.db'));
 // Migration : les comptes à mot de passe local sont remplacés par la connexion Intranet
 if (db.prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'password_hash'").get()) {
     db.exec('DROP TABLE IF EXISTS sessions; DROP TABLE users;');
-    console.log("🔑 Anciens comptes à mot de passe supprimés : la connexion passe par l'Intranet (voir SUPER_ADMINS).");
+    console.log("🔑 Anciens comptes à mot de passe supprimés : la connexion passe par l'Intranet.");
 }
 
 db.exec(`
@@ -23,8 +23,7 @@ db.exec(`
         id       TEXT PRIMARY KEY,
         titre    TEXT NOT NULL,
         debut    TEXT,              -- AAAA-MM-JJ, inclus
-        fin      TEXT,              -- AAAA-MM-JJ, inclus
-        position INTEGER NOT NULL DEFAULT 0
+        fin      TEXT               -- AAAA-MM-JJ, inclus
     );
 
     -- Une zone = un massif d'un département. La clé est celle utilisée dans historique.json.
@@ -61,11 +60,13 @@ db.exec(`
     );
 
     -- Comptes : créés à la première connexion Intranet. Aucun mot de passe n'est conservé.
+    -- responsable = 1 : membre de la structure responsable du site (vérifié à chaque connexion)
     CREATE TABLE IF NOT EXISTS users (
         id                 INTEGER PRIMARY KEY,
         identifiant        TEXT NOT NULL UNIQUE COLLATE NOCASE,
         email              TEXT COLLATE NOCASE,
         nom                TEXT NOT NULL DEFAULT '',
+        responsable        INTEGER NOT NULL DEFAULT 0,
         derniere_connexion TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -130,7 +131,8 @@ function cleZone(dept, idMassif) {
 // --- Camps ---
 
 export function listCamps({ avecMembres = false } = {}) {
-    const camps = db.prepare('SELECT id, titre, debut, fin FROM camps ORDER BY position, titre').all();
+    // Camps datés dans l'ordre chronologique, puis les autres par nom
+    const camps = db.prepare('SELECT id, titre, debut, fin FROM camps ORDER BY debut IS NULL, debut, titre').all();
     const zones = db.prepare(`
         SELECT cz.camp_id, cz.cle, cz.label, z.dept, z.id_massif
         FROM camp_zones cz JOIN zones z ON z.cle = cz.cle
@@ -162,9 +164,8 @@ export function saveCamp(camp) {
             db.prepare('UPDATE camps SET titre = ?, debut = ?, fin = ? WHERE id = ?')
                 .run(camp.titre, camp.debut, camp.fin, camp.id);
         } else {
-            const { pos } = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS pos FROM camps').get();
-            db.prepare('INSERT INTO camps (id, titre, debut, fin, position) VALUES (?, ?, ?, ?, ?)')
-                .run(camp.id, camp.titre, camp.debut, camp.fin, pos);
+            db.prepare('INSERT INTO camps (id, titre, debut, fin) VALUES (?, ?, ?, ?)')
+                .run(camp.id, camp.titre, camp.debut, camp.fin);
         }
         db.prepare('DELETE FROM camp_zones WHERE camp_id = ?').run(camp.id);
         camp.zones.forEach((zone, i) => {
@@ -184,12 +185,6 @@ export function deleteCamp(id) {
     return db.prepare('DELETE FROM camps WHERE id = ?').run(id).changes > 0;
 }
 
-export function reorderCamps(ids) {
-    transaction(() => {
-        ids.forEach((id, i) => db.prepare('UPDATE camps SET position = ? WHERE id = ?').run(i, id));
-    });
-}
-
 // Premier lancement : reprend les camps de camps.json (et leurs clés d'historique)
 export function seedCamps(campsJsonPath) {
     const { n } = db.prepare('SELECT COUNT(*) AS n FROM camps').get();
@@ -201,9 +196,8 @@ export function seedCamps(campsJsonPath) {
                 db.prepare('INSERT OR IGNORE INTO zones (cle, dept, id_massif) VALUES (?, ?, ?)')
                     .run(z.cle, z.dept, z.id_massif);
             }
-            const { pos } = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS pos FROM camps').get();
-            db.prepare('INSERT INTO camps (id, titre, debut, fin, position) VALUES (?, ?, ?, ?, ?)')
-                .run(camp.id, camp.titre, camp.debut ?? null, camp.fin ?? null, pos);
+            db.prepare('INSERT INTO camps (id, titre, debut, fin) VALUES (?, ?, ?, ?)')
+                .run(camp.id, camp.titre, camp.debut ?? null, camp.fin ?? null);
             camp.zones.forEach((z, i) => {
                 db.prepare('INSERT INTO camp_zones (camp_id, cle, label, position) VALUES (?, ?, ?, ?)')
                     .run(camp.id, z.cle, z.label, i);
@@ -219,15 +213,17 @@ export function seedCamps(campsJsonPath) {
 const EST_LUI = '(m.identifiant = $identifiant OR (m.email IS NOT NULL AND m.email = $email))';
 
 export const users = {
-    list: () => db.prepare('SELECT id, identifiant, email, nom, derniere_connexion FROM users ORDER BY nom, identifiant').all(),
+    list: () => db.prepare('SELECT identifiant, email, nom, responsable, derniere_connexion FROM users ORDER BY nom, identifiant').all(),
     // À chaque connexion : crée ou met à jour le compte avec les informations de l'Intranet, puis
     // complète les membres qui lui correspondent (e-mail ajouté par l'admin → identifiant, et inversement)
-    connexion: ({ identifiant, email, nom }) => transaction(() => {
+    // responsable null (API Intranet indisponible) : on garde le rôle connu
+    connexion: ({ identifiant, email, nom, responsable }) => transaction(() => {
         const { id } = db.prepare(`
-            INSERT INTO users (identifiant, email, nom) VALUES (?, ?, ?)
+            INSERT INTO users (identifiant, email, nom, responsable) VALUES ($identifiant, $email, $nom, COALESCE($responsable, 0))
             ON CONFLICT (identifiant) DO UPDATE SET
-                email = excluded.email, nom = excluded.nom, derniere_connexion = datetime('now')
-            RETURNING id`).get(identifiant, email, nom);
+                email = excluded.email, nom = excluded.nom, derniere_connexion = datetime('now'),
+                responsable = COALESCE($responsable, users.responsable)
+            RETURNING id`).get({ $identifiant: identifiant, $email: email, $nom: nom, $responsable: responsable === null ? null : Number(responsable) });
         // node:sqlite refuse un paramètre nommé que la requête n'utilise pas : un objet par requête
         const lui = { $identifiant: identifiant, $email: email };
         db.prepare(`UPDATE OR IGNORE membres SET identifiant = $identifiant
@@ -255,7 +251,7 @@ export const sessions = {
     create: (tokenHash, userId, expiresAt) =>
         db.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(tokenHash, userId, expiresAt),
     user: tokenHash => db.prepare(`
-        SELECT u.id, u.identifiant, u.email, u.nom FROM sessions s JOIN users u ON u.id = s.user_id
+        SELECT u.id, u.identifiant, u.email, u.nom, u.responsable FROM sessions s JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = ? AND s.expires_at > ?`).get(tokenHash, Date.now()),
     delete: tokenHash => db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash),
     purge: () => db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now())

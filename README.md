@@ -31,12 +31,12 @@ server/                 Serveur Node 24
   auth.mjs              Sessions, responsables du site, limitation des tentatives de connexion
   http.mjs              Outils HTTP (réponses, sécurité)
   cli.mjs               Liste des comptes et sauvegardes en ligne de commande
-client/                 Composants SGDF de l'admin (admin.js, admin-app.js)
+client/admin.js         Composants SGDF utilisés par l'admin
 scripts/build-ui.mjs    Construit public/ui à partir de @sgdf/ui
 seed/                   Données importées au premier lancement (camps.json, historique.json)
 docker/                 Exemple de configuration nginx (HTTPS)
-keycloak/               Royaume Keycloak qui simule l'Intranet en local (comptes de test)
-docker-compose.dev.yml  Environnement local : site + Keycloak + boîte mail de test
+dev/                    Intranet simulé en local : royaume Keycloak (comptes de test) et API des adhérents
+docker-compose.dev.yml  Environnement local : site + Intranet simulé + boîte mail de test
 ```
 
 Les données vivantes sont dans `DATA_DIR` (le volume Docker `data`, ou `./data` en local) :
@@ -73,12 +73,12 @@ Pour ajouter un département : ses massifs dans `massifs.json` (identifiant = nu
 L'interface utilise [sgdf-ui](https://gitlab.com/sgdf/projets-benevoles/sgdf-ui) (`@sgdf/ui`, licence MIT) : polices, couleurs et thème clair/sombre de la charte SGDF partout, composants `sgdf-*` dans l'admin.
 
 - **Pages publiques** (accueil, page « été ») : elles n'utilisent que la feuille de style du design system (`ui/sgdf.css`). La barre, le titre, les cartes, les onglets, la liste des étés et le pied de page reprennent le rendu des composants SGDF en HTML/CSS (`public/css/style.css`), sans charger leur JavaScript : affichage immédiat, sans décalage, rapide sur téléphone.
-- **Admin** : vrais composants `sgdf-*`. La page de connexion est en HTML/CSS ; les composants (`ui/admin.js`, `ui/admin-app.js`) ne sont chargés qu'une fois connecté.
+- **Admin** : vrais composants `sgdf-*`. La page de connexion est en HTML/CSS ; les composants (`ui/admin.js`) ne sont chargés qu'une fois connecté.
 - **Mode sombre** : palette bleu nuit définie dans `public/css/style.css` (surcharge des tokens `--sgdf-*`), pour le thème du système comme pour `data-theme="dark"`.
 
 - Le paquet vient du registre GitLab du projet (voir `.npmrc`), sans jeton. Sa version est fixée dans `package.json` ; Web Awesome (`@awesome.me/webawesome`) doit rester dans la plage demandée par `@sgdf/ui`.
 - `npm run build` (lancé aussi dans l'image Docker) regroupe les composants utilisés (`client/`) dans `public/ui/` avec esbuild, ainsi que la feuille de style, les polices et les icônes : tout est servi par le site, sans requête vers un service extérieur.
-- Pour utiliser un nouveau composant dans l'admin, l'importer dans `client/admin-app.js`, puis relancer `npm run build`.
+- Pour utiliser un nouveau composant dans l'admin, l'importer dans `client/admin.js`, puis relancer `npm run build`.
 - Les licences des bibliothèques embarquées sont regroupées dans `public/ui/LICENCES.txt` au moment de la construction.
 - Les couleurs des niveaux de risque (vert, jaune, orange, rouge, noir, avec motifs pour les daltoniens) restent propres au site, dans `public/css/style.css`.
 
@@ -93,26 +93,30 @@ Objectif : 100 sur les quatre catégories Lighthouse (performance, accessibilit�
 
 ## Comptes et rôles
 
-Bouton **Se connecter** en haut de l'accueil : connexion avec l'identifiant (numéro d'adhérent) et le mot de passe de l'**Intranet SGDF**. Le site transmet l'identifiant et le mot de passe au serveur d'authentification de l'Intranet (Keycloak, même échange que la librairie [api-intranet-java](https://gitlab.com/sgdf/projets-benevoles/api-intranet-java)) et ne garde que le nom, l'identifiant et l'e-mail renvoyés. Aucun mot de passe n'est conservé. Le compte est créé à la première connexion.
+Bouton **Se connecter** en haut de l'accueil : connexion avec l'identifiant (numéro d'adhérent) et le mot de passe de l'**Intranet SGDF**, avec les mêmes échanges que la librairie [api-intranet-java](https://gitlab.com/sgdf/projets-benevoles/api-intranet-java) :
+1. le serveur d'authentification de l'Intranet (Keycloak) vérifie l'identifiant et le mot de passe ;
+2. l'API des adhérents donne le nom, l'e-mail et les structures de la personne.
+
+Aucun mot de passe ni jeton n'est conservé. Le compte est créé à la première connexion, et son rôle de responsable revérifié à chaque connexion.
 
 | Rôle | Qui | Peut |
 |---|---|---|
-| Responsable du site | identifiants ou e-mails listés dans `SUPER_ADMINS` | tout : créer, supprimer et ordonner les camps, en nommer les admins, lancer un relevé |
+| Responsable du site | adhérents de la structure **988220500** (fonction principale ou secondaire) | tout : créer et supprimer les camps, en nommer les admins, lancer un relevé, tester l'envoi des mails |
 | Admin d'un camp | membre du camp avec le rôle « Admin » | modifier ce camp (nom, dates, massifs), ajouter ou retirer ses membres, envoyer la prévision tout de suite |
 | Participant d'un camp | membre du camp avec le rôle « Participant » | voir le camp mis en avant sur l'accueil, s'en retirer (après confirmation) |
 
-- Un membre est ajouté avec son **e-mail**, son **numéro d'adhérent**, ou les deux. À sa connexion, il est reconnu par l'un ou l'autre, et l'information manquante est complétée depuis l'Intranet (un membre ajouté par numéro reçoit donc les mails dès sa première connexion).
+- Un membre est ajouté avec son **e-mail** ou son **numéro d'adhérent** (9 chiffres). À sa connexion, il est reconnu par l'un ou l'autre, et son nom et l'information manquante sont complétés depuis l'Intranet (un membre ajouté par numéro reçoit donc les mails dès sa première connexion).
 - Un camp garde toujours au moins un admin : le dernier admin ne peut ni se retirer ni se rétrograder (le responsable du site, lui, peut).
-- Page `/admin` : les camps que l'on administre (tous pour le responsable) et le journal des mails envoyés pour ces camps.
+- Page `/admin` : les camps que l'on administre (tous pour le responsable), triés par date, et le journal des mails envoyés pour ces camps.
 
 ## Installation avec Docker
 
 ```bash
-cp .env.example .env              # compléter PUBLIC_URL, PORT, INTRANET_…, SUPER_ADMINS et la partie SMTP
+cp .env.example .env              # compléter PUBLIC_URL, PORT, INTRANET_… et la partie SMTP
 docker compose up -d --build
 ```
 
-Les valeurs `INTRANET_URL`, `INTRANET_REALM`, `INTRANET_CLIENT_ID` et `INTRANET_CLIENT_SECRET` sont fournies par le SI SGDF : un client Keycloak autorisé à vérifier les identifiants (*Direct access grants*). Mettre son propre identifiant Intranet dans `SUPER_ADMINS`, puis se connecter : on crée alors les camps et on en nomme les admins.
+Les valeurs `INTRANET_…` sont fournies par le SI SGDF : un client Keycloak autorisé à vérifier les identifiants (*Direct access grants*) et l'adresse de l'API des adhérents. Un membre de la structure responsable se connecte, crée les camps et en nomme les admins (structure modifiable avec `STRUCTURE_RESPONSABLE`).
 
 Lors de la mise à jour depuis une version avec comptes à mot de passe, ces comptes sont supprimés et les contacts des camps deviennent des participants (ils continuent à recevoir les mails).
 
@@ -152,7 +156,7 @@ N'importe quel serveur SMTP convient : `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `S
 
 ## Développement en local
 
-Avec Docker, sans rien installer d'autre : le site, un **Keycloak qui simule l'Intranet** et **Mailpit**, une boîte mail de test.
+Avec Docker, sans rien installer d'autre : le site, un **Intranet simulé** (Keycloak et API des adhérents) et **Mailpit**, une boîte mail de test.
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
@@ -162,11 +166,11 @@ docker compose -f docker-compose.dev.yml up -d --build
 - Mails envoyés par le site : http://localhost:8025
 - Administration Keycloak : http://localhost:8180 (`admin` / `admin`)
 
-Comptes de test (mot de passe `chef`, dans `keycloak/sgdf_local-realm.json`) :
+Comptes de test (mot de passe `chef`, dans `dev/sgdf_local-realm.json`, avec leur structure) :
 
 | Identifiant | Nom | Pour tester |
 |---|---|---|
-| `100000001` | Camille Responsable | responsable du site (`SUPER_ADMINS`) |
+| `100000001` | Camille Responsable | responsable du site (structure 988220500) |
 | `100000002` | Dominique Admin | à nommer admin d'un camp (e-mail `dominique.admin@example.org`) |
 | `100000003` | Alex Participant | à ajouter comme participant (par son numéro) |
 

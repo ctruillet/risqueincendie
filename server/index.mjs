@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, copyFileSync, statSync, readdirSync } from 'node:fs';
 import { join, extname, normalize, sep } from 'node:path';
 import { createHash } from 'node:crypto';
-import { PORT, PUBLIC_DIR, SEED_DIR, DATA_DIR, HISTORY_PATH, massifs, SUPER_ADMINS, intranetConfigure } from './config.mjs';
+import { PORT, PUBLIC_DIR, SEED_DIR, DATA_DIR, HISTORY_PATH, massifs, INTRANET, intranetConfigure } from './config.mjs';
 import { listCamps, seedCamps } from './db.mjs';
 import { api } from './api.mjs';
 import { demarrerPlanificateur } from './scheduler.mjs';
@@ -23,7 +23,7 @@ if (!existsSync(HISTORY_PATH) && existsSync(join(SEED_DIR, 'historique.json'))) 
 }
 seedCamps(join(SEED_DIR, 'camps.json'));
 if (!intranetConfigure) console.log('⚠️ Connexion Intranet non configurée : renseigner INTRANET_URL, INTRANET_REALM et INTRANET_CLIENT_ID.');
-if (SUPER_ADMINS.size === 0) console.log("👤 Aucun responsable du site : ajouter son identifiant Intranet dans SUPER_ADMINS.");
+if (!INTRANET.apiUrl) console.log("⚠️ API Intranet non configurée (INTRANET_API_URL) : personne ne sera reconnu comme responsable du site.");
 
 // --- Fichiers du site ---
 

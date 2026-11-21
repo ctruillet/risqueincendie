@@ -1,14 +1,15 @@
-// Interface d'administration : camps (dates, massifs, membres) et mails envoyés.
-// Le responsable du site voit tous les camps ; un admin de camp, seulement les siens.
-// Les composants sgdf-* viennent du design system SGDF (ui/admin.js).
+// Administration : camps (dates, massifs, membres) et mails envoyés.
+// Responsable du site : tous les camps, création et suppression. Admin d'un camp : ses camps seulement.
+// Les composants sgdf-* viennent du design system SGDF (ui/admin.js, chargé après la connexion).
 const $ = sel => document.querySelector(sel);
 
 let massifs = {};
 let camps = [];
 let utilisateur = null;
-let campEdite = null; // null = nouveau camp
+let campEdite = null;      // null = nouveau camp
+let membresEdites = [];    // membres du camp en cours de modification
 
-// --- Appels à l'API ---
+// --- Outils ---
 
 async function api(chemin, { method = 'GET', body } = {}) {
     const res = await fetch(`api/${chemin}`, {
@@ -18,26 +19,22 @@ async function api(chemin, { method = 'GET', body } = {}) {
     });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401) {
-        allerConnexion();
+        location.replace(`connexion?retour=${encodeURIComponent('/admin' + location.hash)}`);
         throw new Error('Session expirée, reconnectez-vous.');
     }
     if (!res.ok) throw new Error(data.erreur ?? `Erreur ${res.status}`);
     return data;
 }
 
-// --- Messages ---
-
 function notifier(texte, { erreur = false } = {}) {
-    // Composants pas encore chargés : simple boîte d'alerte du navigateur
     if (!customElements.get('sgdf-toast')) return alert(texte);
     $('#toast').create(texte, erreur
         ? { variant: 'danger', title: 'Erreur', duration: 8000 }
         : { variant: 'success', title: 'C\'est fait' });
 }
 
-// Erreur affichée dans le formulaire (ou le bloc) qui contient `el`
-function erreurForm(el, texte) {
-    const callout = el.querySelector('.form-error') ?? el.parentElement.querySelector('.form-error');
+function erreurForm(texte) {
+    const callout = $('#form-camp .form-error');
     callout.textContent = texte ?? '';
     callout.hidden = !texte;
 }
@@ -58,7 +55,6 @@ async function action(bouton, fn) {
 function confirmer({ titre, texte, bouton = 'Confirmer', variante = 'danger' }) {
     const dialog = $('#confirmation');
     dialog.title = titre;
-    dialog.variant = variante;
     $('#confirmation-texte').textContent = texte;
     const ok = $('#confirmation-ok');
     ok.textContent = bouton;
@@ -79,29 +75,19 @@ function confirmer({ titre, texte, bouton = 'Confirmer', variante = 'danger' }) 
 }
 
 const valeur = (racine, nom) => String(racine.querySelector(`[name=${nom}]`)?.value ?? '').trim();
-
-// --- Connexion (par l'Intranet, sur la page /connexion) ---
-
-function allerConnexion() {
-    location.replace(`connexion?retour=${encodeURIComponent('/admin' + location.hash)}`);
-}
+const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year: 'numeric' });
+// Nom affiché d'un membre : son nom (connu après sa première connexion), sinon ce qu'a saisi l'admin
+const nomMembre = m => m.nom || m.email || `N° ${m.identifiant}`;
 
 $('#btn-logout').addEventListener('click', async () => {
     await api('logout', { method: 'POST', body: {} }).catch(() => {});
     location.replace('./');
 });
 
-// --- Onglets ---
-
-$('#vue-app').addEventListener('sgdf-tab-show', e => {
-    if (e.target !== $('#vue-app')) return;
-    if (e.detail.name === 'envois') chargerEnvois();
-    if (e.detail.name === 'camps') chargerStatus();
-});
-
-// --- Statut du relevé ---
+// --- Relevé des prévisions (responsable du site) ---
 
 async function chargerStatus() {
+    if (!utilisateur.superAdmin) return;
     const s = await api('status');
     const passage = s.dernierPassage
         ? `${new Date(s.dernierPassage).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })} — ${escapeHtml(s.dernierResultat ?? '')}`
@@ -127,55 +113,41 @@ $('#btn-test-mail').addEventListener('click', e => action(e.currentTarget, async
 // --- Liste des camps ---
 
 function etiquetteCamp(camp) {
-    if (!camp.debut) return '<sgdf-tag slot="header-actions" variant="neutral" size="small">Sans dates</sgdf-tag>';
-    if (camp.fin < getIsoDate(0)) return '<sgdf-tag slot="header-actions" variant="neutral" size="small">Terminé</sgdf-tag>';
-    if (camp.debut <= getIsoDate(1)) return '<sgdf-tag slot="header-actions" variant="success" size="small">En cours</sgdf-tag>';
-    return '<sgdf-tag slot="header-actions" variant="warning" size="small">À venir</sgdf-tag>';
+    const tag = (variante, texte) => `<sgdf-tag slot="header-actions" variant="${variante}" size="small">${texte}</sgdf-tag>`;
+    if (!camp.debut) return tag('neutral', 'Sans dates');
+    if (camp.fin < getIsoDate(0)) return tag('neutral', 'Terminé');
+    if (camp.debut <= getIsoDate(0)) return tag('success', 'En cours');
+    return tag('warning', 'À venir');
 }
 
-// Bouton icône avec infobulle (le libellé sert aussi aux lecteurs d'écran)
-const iconeAction = (nom, icone, libelle, desactive = false, variante = '') =>
-    `<sgdf-icon-button name="${icone}" library="solid" label="${libelle}" title="${libelle}" data-action="${nom}"
-        ${variante ? `variant="${variante}"` : ''} ${desactive ? 'disabled' : ''}></sgdf-icon-button>`;
-
-const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year: 'numeric' });
+function listeNoms(membres, role) {
+    const noms = membres.filter(m => m.role === role).map(m => escapeHtml(nomMembre(m)));
+    return noms.length ? noms.join(', ') : 'aucun';
+}
 
 function afficherCamps() {
     const liste = $('#liste-camps');
     if (camps.length === 0) {
-        liste.innerHTML = `<p class="vide">${utilisateur.superAdmin ? 'Aucun camp pour l\'instant.' : 'Aucun camp à gérer.'}</p>`;
+        liste.innerHTML = '<p class="vide">Aucun camp pour l\'instant.</p>';
         return;
     }
-    liste.innerHTML = camps.map((camp, i) => {
-        const dates = camp.debut ? `Du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'Pas de dates : aucun mail envoyé';
-        const zones = camp.zones.map(z => escapeHtml(z.label)).join(', ');
-        const membres = camp.membres.length
-            ? camp.membres.map(m => `${escapeHtml(m.nom || m.email || m.identifiant)}${m.role === 'admin' ? ' (admin)' : ''}`).join(', ')
-            : 'Aucun membre';
-        const responsable = utilisateur.superAdmin;
-        return `
+    liste.innerHTML = camps.map(camp => `
         <sgdf-card class="camp-item" data-id="${escapeHtml(camp.id)}">
             <h3 slot="header" class="camp-titre">${escapeHtml(camp.titre)}</h3>
             ${etiquetteCamp(camp)}
-            <ul class="camp-meta">
-                <li><sgdf-icon name="calendar-days" library="solid"></sgdf-icon>${dates}</li>
-                <li><sgdf-icon name="tree" library="solid"></sgdf-icon>${zones}</li>
-                <li><sgdf-icon name="users" library="solid"></sgdf-icon>${membres}</li>
-            </ul>
-            <div slot="footer" class="actions actions-camp">
-                <sgdf-button size="small" appearance="outlined" data-action="modifier">
-                    <sgdf-icon slot="prefix" name="pen" library="solid"></sgdf-icon>Modifier
-                </sgdf-button>
-                <span class="actions-icones">
-                    ${iconeAction('envoyer', 'paper-plane', 'Envoyer la prévision de demain aux membres', !camp.membres.some(m => m.email))}
-                    ${responsable ? `
-                    ${iconeAction('monter', 'arrow-up', 'Monter', i === 0)}
-                    ${iconeAction('descendre', 'arrow-down', 'Descendre', i === camps.length - 1)}
-                    ${iconeAction('supprimer', 'trash-can', 'Supprimer le camp', false, 'danger')}` : ''}
-                </span>
+            <dl class="camp-infos">
+                <dt>Dates</dt><dd>${camp.debut ? `du ${dateLongue(camp.debut)} au ${dateLongue(camp.fin)}` : 'pas de dates : aucun mail envoyé'}</dd>
+                <dt>Massifs</dt><dd>${camp.zones.map(z => escapeHtml(z.label)).join(', ')}</dd>
+                <dt>Admins</dt><dd>${listeNoms(camp.membres, 'admin')}</dd>
+                <dt>Participants</dt><dd>${listeNoms(camp.membres, 'participant')}</dd>
+            </dl>
+            <div slot="footer" class="actions">
+                <sgdf-button size="small" variant="primary" data-action="modifier">Modifier</sgdf-button>
+                <sgdf-button size="small" appearance="outlined" data-action="envoyer"
+                    ${camp.membres.some(m => m.email) ? '' : 'disabled'}>Envoyer la prévision de demain</sgdf-button>
+                ${utilisateur.superAdmin ? '<sgdf-button size="small" appearance="text" variant="danger" data-action="supprimer">Supprimer</sgdf-button>' : ''}
             </div>
-        </sgdf-card>`;
-    }).join('');
+        </sgdf-card>`).join('');
 }
 
 async function chargerCamps() {
@@ -186,56 +158,42 @@ async function chargerCamps() {
 $('#liste-camps').addEventListener('click', async e => {
     const bouton = e.target.closest('[data-action]');
     if (!bouton || bouton.disabled) return;
-    const id = bouton.closest('[data-id]').dataset.id;
-    const camp = camps.find(c => c.id === id);
-    const i = camps.indexOf(camp);
+    const camp = camps.find(c => c.id === bouton.closest('[data-id]').dataset.id);
+    const chemin = `camps/${encodeURIComponent(camp.id)}`;
 
-    switch (bouton.dataset.action) {
-        case 'modifier':
-            return ouvrirEdition(camp);
-        case 'envoyer':
-            if (!await confirmer({
-                titre: 'Envoyer la prévision',
-                texte: `Envoyer maintenant la prévision de demain aux membres de « ${camp.titre} » ?`,
-                bouton: 'Envoyer', variante: 'primary'
-            })) return;
-            return action(bouton, async () => {
-                const r = await api(`camps/${encodeURIComponent(id)}/envoyer`, { method: 'POST', body: {} });
-                notifier(r.erreur ? `Envoyé, avec des erreurs : ${r.erreur}` : 'Mail envoyé aux membres.', { erreur: Boolean(r.erreur) });
-            });
-        case 'supprimer':
-            if (!await confirmer({
-                titre: 'Supprimer le camp',
-                texte: `Supprimer « ${camp.titre} » ? Ses membres en seront retirés (l'historique des massifs est conservé).`,
-                bouton: 'Supprimer'
-            })) return;
-            return action(bouton, async () => {
-                await api(`camps/${encodeURIComponent(id)}`, { method: 'DELETE' });
-                await chargerCamps();
-                notifier('Camp supprimé.');
-            });
-        case 'monter':
-        case 'descendre': {
-            const j = bouton.dataset.action === 'monter' ? i - 1 : i + 1;
-            [camps[i], camps[j]] = [camps[j], camps[i]];
-            afficherCamps();
-            return api('camps/ordre', { method: 'POST', body: { ids: camps.map(c => c.id) } })
-                .catch(err => notifier(err.message, { erreur: true }));
-        }
+    if (bouton.dataset.action === 'modifier') return ouvrirEdition(camp);
+    if (bouton.dataset.action === 'envoyer') {
+        if (!await confirmer({
+            titre: 'Envoyer la prévision',
+            texte: `Envoyer maintenant la prévision de demain aux membres de « ${camp.titre} » ?`,
+            bouton: 'Envoyer', variante: 'primary'
+        })) return;
+        return action(bouton, async () => {
+            const r = await api(`${chemin}/envoyer`, { method: 'POST', body: {} });
+            notifier(r.erreur ? `Envoyé, avec des erreurs : ${r.erreur}` : 'Mail envoyé aux membres.', { erreur: Boolean(r.erreur) });
+        });
+    }
+    if (bouton.dataset.action === 'supprimer') {
+        if (!await confirmer({
+            titre: 'Supprimer le camp',
+            texte: `Supprimer « ${camp.titre} » et la liste de ses membres ? L'historique des massifs est conservé.`,
+            bouton: 'Supprimer'
+        })) return;
+        return action(bouton, async () => {
+            await api(chemin, { method: 'DELETE' });
+            await chargerCamps();
+            notifier('Camp supprimé.');
+        });
     }
 });
 
-// --- Édition d'un camp ---
+// --- Massifs du camp ---
 
-function optionsDepts() {
-    return Object.entries(massifs).map(([dept, d]) =>
-        `<sgdf-option value="${dept}">${escapeHtml(d.nom)}</sgdf-option>`).join('');
-}
+const optionsDepts = () => Object.entries(massifs).map(([dept, d]) =>
+    `<sgdf-option value="${dept}">${escapeHtml(d.nom)}</sgdf-option>`).join('');
 
-function optionsMassifs(dept) {
-    return (massifs[dept]?.massifs ?? []).map(m =>
-        `<sgdf-option value="${m.id}">${escapeHtml(m.nom)}</sgdf-option>`).join('');
-}
+const optionsMassifs = dept => (massifs[dept]?.massifs ?? []).map(m =>
+    `<sgdf-option value="${m.id}">${escapeHtml(m.nom)}</sgdf-option>`).join('');
 
 function ajouterZone(zone = {}) {
     const ligne = $('#tpl-zone').content.firstElementChild.cloneNode(true);
@@ -250,15 +208,6 @@ function ajouterZone(zone = {}) {
     ligne.querySelector('[name=label]').value = zone.label ?? '';
 }
 
-function ajouterMembre(membre = {}) {
-    const ligne = $('#tpl-membre').content.firstElementChild.cloneNode(true);
-    $('#membres').append(ligne);
-    ligne.querySelector('[name=nom]').value = membre.nom ?? '';
-    ligne.querySelector('[name=email]').value = membre.email ?? '';
-    ligne.querySelector('[name=identifiant]').value = membre.identifiant ?? '';
-    ligne.querySelector('[name=role]').value = membre.role ?? 'participant';
-}
-
 // Changer de département recharge la liste de ses massifs
 $('#zones').addEventListener('change', e => {
     const dept = e.target.closest('[name=dept]');
@@ -268,39 +217,98 @@ $('#zones').addEventListener('change', e => {
     selectMassif.value = massifs[dept.value]?.massifs[0]?.id ?? '';
 });
 
-for (const conteneur of ['#zones', '#membres']) {
-    $(conteneur).addEventListener('click', e => {
-        if (e.target.closest('.btn-suppr')) e.target.closest('.ligne-form').remove();
-    });
-}
+$('#zones').addEventListener('click', e => {
+    if (e.target.closest('.btn-suppr')) e.target.closest('.ligne-form').remove();
+});
 
 $('#btn-ajout-zone').addEventListener('click', () => ajouterZone());
-$('#btn-ajout-membre').addEventListener('click', () => ajouterMembre());
+
+// --- Membres du camp ---
+
+function afficherMembres() {
+    $('#membres').innerHTML = membresEdites.length === 0
+        ? '<li class="vide">Aucun membre pour l\'instant.</li>'
+        : membresEdites.map((m, i) => {
+            const details = m.nom
+                ? [m.email, m.identifiant && `n° ${m.identifiant}`].filter(Boolean).join(' · ')
+                : 'Pas encore connecté';
+            return `
+            <li class="membre" data-i="${i}">
+                <span class="membre-qui"><strong>${escapeHtml(nomMembre(m))}</strong><small>${escapeHtml(details)}</small></span>
+                <select class="champ-select" aria-label="Rôle de ${escapeHtml(nomMembre(m))}">
+                    <option value="participant" ${m.role === 'participant' ? 'selected' : ''}>Participant</option>
+                    <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Admin</option>
+                </select>
+                <sgdf-icon-button name="trash-can" library="solid" label="Retirer ${escapeHtml(nomMembre(m))}"></sgdf-icon-button>
+            </li>`;
+        }).join('');
+}
+
+$('#membres').addEventListener('change', e => {
+    const li = e.target.closest('.membre');
+    if (li) membresEdites[li.dataset.i].role = e.target.value;
+});
+
+$('#membres').addEventListener('click', e => {
+    if (!e.target.closest('sgdf-icon-button')) return;
+    membresEdites.splice(e.target.closest('.membre').dataset.i, 1);
+    afficherMembres();
+});
+
+// Un seul champ : un e-mail ou un numéro d'adhérent (9 chiffres)
+function ajouterMembre() {
+    const champ = $('#membre-qui');
+    const saisie = champ.value.trim();
+    if (!saisie) return champ.focus();
+    let membre;
+    if (/^\S+@\S+\.\S+$/.test(saisie)) membre = { email: saisie.toLowerCase() };
+    else if (/^\d{9}$/.test(saisie.replace(/\s/g, ''))) membre = { identifiant: saisie.replace(/\s/g, '') };
+    else return notifier('Saisir un e-mail ou un numéro d\'adhérent à 9 chiffres.', { erreur: true });
+
+    const deja = membresEdites.some(m =>
+        (membre.email && m.email?.toLowerCase() === membre.email) || (membre.identifiant && m.identifiant === membre.identifiant));
+    if (deja) return notifier('Cette personne est déjà membre du camp.', { erreur: true });
+
+    membresEdites.push({ ...membre, nom: '', role: $('#membre-role').value });
+    afficherMembres();
+    champ.value = '';
+    champ.focus();
+}
+
+$('#btn-ajout-membre').addEventListener('click', ajouterMembre);
+// Entrée dans le champ ajoute le membre (au lieu d'enregistrer le camp)
+$('#membre-qui').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    ajouterMembre();
+});
+
+// --- Création et modification d'un camp ---
 
 function ouvrirEdition(camp = null) {
     campEdite = camp;
     const form = $('#form-camp');
-    erreurForm(form);
+    erreurForm();
     $('#titre-edition').textContent = camp ? `Modifier « ${camp.titre} »` : 'Nouveau camp';
     form.querySelector('[name=titre]').value = camp?.titre ?? '';
     form.querySelector('[name=debut]').value = camp?.debut ?? '';
     form.querySelector('[name=fin]').value = camp?.fin ?? '';
     form.querySelector('[name=fin]').min = camp?.debut ?? '';
     $('#zones').innerHTML = '';
-    $('#membres').innerHTML = '';
     (camp?.zones.length ? camp.zones : [{}]).forEach(ajouterZone);
-    (camp?.membres.length ? camp.membres : [{ role: 'admin' }]).forEach(ajouterMembre);
+    membresEdites = structuredClone(camp?.membres ?? []);
+    afficherMembres();
+    $('#membre-qui').value = '';
+    $('#membre-role').value = membresEdites.length ? 'participant' : 'admin';
 
     $('#vue-liste').hidden = true;
     $('#vue-edition').hidden = false;
     $('#vue-edition').scrollIntoView({ block: 'start' });
-    form.querySelector('[name=titre]').focus();
 }
 
 function fermerEdition() {
     $('#vue-edition').hidden = true;
     $('#vue-liste').hidden = false;
-    chargerStatus().catch(() => {});
 }
 
 $('#btn-nouveau').addEventListener('click', () => ouvrirEdition());
@@ -316,7 +324,9 @@ $('#form-camp [name=debut]').addEventListener('change', e => {
 $('#form-camp').addEventListener('submit', async e => {
     e.preventDefault();
     const form = e.target;
-    erreurForm(form);
+    erreurForm();
+    // Membre saisi mais pas encore ajouté : on l'ajoute avant d'enregistrer
+    if ($('#membre-qui').value.trim()) ajouterMembre();
     const body = {
         titre: valeur(form, 'titre'),
         debut: valeur(form, 'debut') || null,
@@ -324,20 +334,21 @@ $('#form-camp').addEventListener('submit', async e => {
         zones: [...document.querySelectorAll('#zones .zone-ligne')].map(l => ({
             dept: valeur(l, 'dept'), id_massif: valeur(l, 'id_massif'), label: valeur(l, 'label')
         })),
-        membres: [...document.querySelectorAll('#membres .membre-ligne')]
-            .map(l => ({ nom: valeur(l, 'nom'), email: valeur(l, 'email'), identifiant: valeur(l, 'identifiant'), role: valeur(l, 'role') }))
-            .filter(m => m.nom || m.email || m.identifiant)
+        membres: membresEdites.map(({ nom, email, identifiant, role }) => ({ nom, email, identifiant, role }))
     };
     const bouton = form.querySelector('sgdf-button[submit]');
     bouton.loading = true;
     try {
         if (campEdite) await api(`camps/${encodeURIComponent(campEdite.id)}`, { method: 'PUT', body });
         else await api('camps', { method: 'POST', body });
+        notifier('Camp enregistré.');
+        // Un admin qui s'est retiré du rôle n'a plus accès : retour à l'accueil
+        const { user } = await api('me');
+        if (!user.admin) return location.replace('./');
         await chargerCamps();
         fermerEdition();
-        notifier('Camp enregistré.');
     } catch (err) {
-        erreurForm(form, err.message);
+        erreurForm(err.message);
     } finally {
         bouton.loading = false;
     }
@@ -365,29 +376,33 @@ async function chargerEnvois() {
     }
 }
 
+$('#vue-app').addEventListener('sgdf-tab-show', e => {
+    if (e.target === $('#vue-app') && e.detail.name === 'envois') chargerEnvois();
+});
+
 // --- Démarrage ---
 
 async function demarrer() {
     const { user } = await api('me');
-    if (!user) return allerConnexion();
+    if (!user) return api('mes-camps'); // 401 : renvoie vers la connexion
     utilisateur = user;
-    // Composants de l'admin, chargés seulement maintenant
-    await Promise.all([import('/ui/admin.js'), import('/ui/admin-app.js')]);
-    await customElements.whenDefined('sgdf-select');
     $('#user-nom').textContent = user.nom || user.identifiant;
-    $('#session').hidden = false;
+    await import('/ui/admin.js');
+    await customElements.whenDefined('sgdf-select');
     if (!user.admin) {
         $('#vue-aucun').hidden = false;
         return;
     }
-    // Créer, supprimer, ordonner les camps et lancer un relevé : responsable du site seulement
-    for (const el of document.querySelectorAll('.responsable')) el.hidden = !user.superAdmin;
+    if (user.superAdmin) {
+        $('#titre-admin').textContent = 'Tous les camps';
+        $('#bloc-releve').hidden = false;
+        $('#btn-nouveau').hidden = false;
+    }
     $('#vue-app').hidden = false;
     massifs = await fetchJson('massifs.json');
     await Promise.all([chargerCamps(), chargerStatus()]);
     // Lien « Gérer le camp » de l'accueil : admin#camp=<id>
-    const demande = new URLSearchParams(location.hash.slice(1)).get('camp');
-    const camp = camps.find(c => c.id === demande);
+    const camp = camps.find(c => c.id === new URLSearchParams(location.hash.slice(1)).get('camp'));
     if (camp) ouvrirEdition(camp);
     history.replaceState(null, '', location.pathname);
 }

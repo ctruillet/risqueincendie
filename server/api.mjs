@@ -1,9 +1,9 @@
 // API du site : /api/…
 // Trois niveaux d'accès, après connexion avec les identifiants Intranet :
-//   responsable du site (SUPER_ADMINS) : tout, y compris créer, supprimer et ordonner les camps
+//   responsable du site (structure STRUCTURE_RESPONSABLE) : tout, y compris créer et supprimer les camps
 //   admin d'un camp                    : modifie ce camp (dates, massifs, membres) et envoie ses mails
 //   participant d'un camp              : voit ce camp mis en avant sur l'accueil et peut s'en retirer
-import { listCamps, getCamp, saveCamp, deleteCamp, reorderCamps, membres, envois } from './db.mjs';
+import { listCamps, getCamp, saveCamp, deleteCamp, membres, envois } from './db.mjs';
 import { login, logout, currentUser, tropDeTentatives, noterEchec } from './auth.mjs';
 import { readHistory, getParisDate } from './history.mjs';
 import { envoyerCamp, envoyerTest, smtpConfigure } from './notify.mjs';
@@ -96,13 +96,6 @@ async function routeCamps(req, res, user, id, action) {
         exigerUnCamp(user);
         return json(req, res, 200, campsAdmin(user));
     }
-    if (m === 'POST' && id === 'ordre') {
-        exigerSuperAdmin(user);
-        const { ids } = await lireJson(req);
-        if (!Array.isArray(ids)) throw new HttpError(400, 'Liste attendue');
-        reorderCamps(ids.map(String));
-        return json(req, res, 200, { ok: true });
-    }
     if (m === 'POST' && !id) {
         exigerSuperAdmin(user);
         const camp = validerCamp(await lireJson(req));
@@ -157,7 +150,7 @@ export async function api(req, res, chemin) {
 
     switch (`${m} ${ressource}`) {
         case 'GET status':
-            exigerUnCamp(user);
+            exigerSuperAdmin(user);
             return json(req, res, 200, {
                 smtp: smtpConfigure, ...etat, demain: getParisDate(1),
                 intervalle: UPDATE_INTERVAL_MINUTES, saison: [SEASON_START, SEASON_END], heureDebut: START_HOUR
@@ -170,7 +163,7 @@ export async function api(req, res, chemin) {
             await passage({ force: true });
             return json(req, res, 200, etat);
         case 'POST test-mail':
-            exigerUnCamp(user);
+            exigerSuperAdmin(user);
             if (!user.email) throw new HttpError(400, "Votre compte Intranet n'a pas d'e-mail");
             try {
                 await envoyerTest(user.email);

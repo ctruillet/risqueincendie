@@ -1,30 +1,24 @@
-/* Mise en page de l'administration. L'apparence des champs, boutons, onglets et boîtes
-   de dialogue vient des composants sgdf-* (design system SGDF). */
+/* Connexion et administration. L'apparence des champs, boutons, onglets et boîtes de dialogue
+   de l'admin vient des composants sgdf-* (design system SGDF). */
 
 [hidden] { display: none !important; }
 
 /* Boîtes de dialogue et notifications : invisibles tant que leurs composants ne sont pas chargés */
 sgdf-dialog:not(:defined), sgdf-toast:not(:defined) { display: none; }
 
-/* Cartes plus compactes que le réglage par défaut du design system */
 sgdf-card { --spacing: 1rem; }
 sgdf-card h2[slot="header"], sgdf-card h3[slot="header"] { margin: 0; font-size: 1.1rem; line-height: 1.3; }
 
-.session { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
-.session-email { opacity: 0.85; }
-
 .carte-etroite { max-width: 440px; width: 100%; align-self: center; box-sizing: border-box; }
-
 .pile { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
 #vue-edition { margin-top: 16px; }
-
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.actions-camp { justify-content: space-between; width: 100%; }
-.actions-icones { display: flex; gap: 2px; }
 .status-texte { margin-bottom: 12px; line-height: 1.6; }
+.vide { color: var(--text-muted); text-align: center; list-style: none; }
+.hint-form { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
 
-/* Formulaire de connexion : champs et bouton natifs au rendu de sgdf-input et sgdf-button,
-   pour que la page de connexion s'affiche sans charger les composants */
+/* Page de connexion : champs et bouton natifs au rendu de sgdf-input et sgdf-button,
+   affichés sans charger les composants */
 .champ { display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; font-weight: var(--sgdf-font-weight-semibold); }
 
 .champ input {
@@ -68,17 +62,17 @@ a.bouton { display: inline-flex; align-items: center; text-decoration: none; }
     font-size: 0.9rem;
 }
 
-/* Formulaires */
+/* Formulaire d'un camp */
 .form { display: flex; flex-direction: column; gap: 16px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-inline { flex-direction: row; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
-.form-inline sgdf-input { flex: 1 1 200px; }
 
 fieldset {
+    /* Par défaut, un fieldset s'élargit à son contenu et déborde de la carte */
+    min-width: 0;
+    margin: 0;
+    padding: 12px 16px 16px;
     border: 1px solid var(--border-color);
     border-radius: var(--sgdf-border-radius-large);
-    padding: 12px 16px 16px;
-    margin: 0;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -90,45 +84,47 @@ legend { font-family: var(--sgdf-font-serif); font-weight: 700; padding: 0 6px; 
 .lignes { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .ligne-form { display: grid; gap: 8px; align-items: end; }
 .zone-ligne { grid-template-columns: 0.9fr 1.4fr 1.1fr auto; }
-.membre-ligne { grid-template-columns: 1fr 1.4fr 1fr 0.9fr auto; }
 
-.hint-form { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+/* Membres : une ligne par personne, puis un champ unique pour en ajouter */
+.liste-membres { width: 100%; margin: 0; padding: 0; list-style: none; }
 
-/* Liste des camps */
-.camp-meta { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.92rem; }
-.camp-meta li { display: flex; align-items: baseline; gap: 10px; }
-.camp-meta sgdf-icon { flex-shrink: 0; color: var(--text-muted); }
-
-.vide { color: var(--text-muted); text-align: center; }
-
-/* Listes simples (mails envoyés) */
-.liste-simple { list-style: none; margin: 0; padding: 0; }
-
-.liste-simple > li {
+.membre {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 10px;
-    padding: 10px 0;
+    padding: 8px 0;
     border-bottom: 1px solid var(--border-color);
 }
 
-.liste-simple > li.envoi { flex-direction: column; align-items: stretch; gap: 4px; }
+.membre-qui { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.membre-qui strong { overflow-wrap: anywhere; }
+.membre-qui small { color: var(--text-muted); overflow-wrap: anywhere; }
+.membre .champ-select { flex: 0 0 8.5rem; }
+
+.ajout-membre { width: 100%; display: grid; grid-template-columns: 1fr 8.5rem auto; gap: 8px; align-items: end; }
+.champ-petit { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: var(--sgdf-font-weight-semibold); }
+
+/* Carte d'un camp dans la liste */
+.camp-infos { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 0.92rem; }
+.camp-infos dt { color: var(--text-muted); }
+.camp-infos dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Mails envoyés */
+.liste-simple { list-style: none; margin: 0; padding: 0; }
+.liste-simple > li { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
 .envoi-ligne { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .envoi small { color: var(--text-muted); overflow-wrap: anywhere; }
 
-
-/* Tablette : les champs d'un membre sur deux colonnes */
-@media (max-width: 900px) {
-    .membre-ligne { grid-template-columns: 1fr 1fr; }
-    .membre-ligne .btn-suppr { justify-self: end; }
-}
-
 @media (max-width: 600px) {
-    .session-email { display: none; }
     .form-row { grid-template-columns: 1fr; }
-    .zone-ligne, .membre-ligne { grid-template-columns: 1fr auto; }
+    .zone-ligne { grid-template-columns: 1fr auto; }
     .ligne-form > :not(.btn-suppr) { grid-column: 1; }
     .ligne-form .btn-suppr { grid-column: 2; grid-row: 1; }
     .ligne-form { padding-bottom: 12px; border-bottom: 1px dashed var(--border-color); }
+    .ajout-membre { grid-template-columns: 1fr auto; }
+    .ajout-membre sgdf-input { grid-column: 1 / -1; }
+    .membre { flex-wrap: wrap; }
+    .membre-qui { flex-basis: 100%; }
+    .camp-infos { grid-template-columns: 1fr; gap: 0; }
+    .camp-infos dd { margin-bottom: 6px; }
 }

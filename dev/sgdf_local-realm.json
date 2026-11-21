@@ -27,8 +27,8 @@
       "emailVerified": true,
       "enabled": true,
       "attributes": {
-        "role_de_test": [
-          "responsable du site (SUPER_ADMINS)"
+        "structure": [
+          "988220500"
         ]
       },
       "credentials": [
@@ -47,8 +47,8 @@
       "emailVerified": true,
       "enabled": true,
       "attributes": {
-        "role_de_test": [
-          "à nommer admin d'un camp"
+        "structure": [
+          "130000000"
         ]
       },
       "credentials": [
@@ -67,8 +67,8 @@
       "emailVerified": true,
       "enabled": true,
       "attributes": {
-        "role_de_test": [
-          "à ajouter comme participant"
+        "structure": [
+          "130000000"
         ]
       },
       "credentials": [

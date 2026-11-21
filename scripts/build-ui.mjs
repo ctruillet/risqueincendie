@@ -1,5 +1,5 @@
 // Construit public/ui/ à partir du design system SGDF (@sgdf/ui) :
-//   admin.js, admin-app.js  composants de l'admin (connexion, puis le reste après connexion)
+//   admin.js            composants de l'admin (chargés après la connexion)
 //   Les pages publiques n'utilisent que sgdf.css : leurs éléments reprennent le rendu SGDF en HTML/CSS.
 //   sgdf.css            tokens, thème, styles globaux et polices de la charte (servies localement)
 //   icons/              icônes chargées à la demande par sgdf-icon
@@ -17,10 +17,7 @@ rmSync(sortie, { recursive: true, force: true });
 mkdirSync(sortie, { recursive: true });
 
 await build({
-    entryPoints: {
-        admin: join(racine, 'client/admin.js'),
-        'admin-app': join(racine, 'client/admin-app.js')
-    },
+    entryPoints: { admin: join(racine, 'client/admin.js') },
     outdir: sortie,
     bundle: true,
     splitting: true,

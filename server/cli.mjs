@@ -5,14 +5,13 @@ import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { users, backupTo } from './db.mjs';
 import { DATA_DIR } from './config.mjs';
-import { estSuperAdmin } from './auth.mjs';
 
 const [commande] = process.argv.slice(2);
 
 switch (commande) {
     case 'list-users':
         for (const u of users.list()) {
-            console.log(`${u.identifiant}\t${u.nom}\t${u.email ?? ''}\t(dernière connexion ${u.derniere_connexion})${estSuperAdmin(u) ? '\tresponsable' : ''}`);
+            console.log(`${u.identifiant}\t${u.nom}\t${u.email ?? ''}\t(dernière connexion ${u.derniere_connexion})${u.responsable ? '\tresponsable' : ''}`);
         }
         break;
     case 'backup': {
