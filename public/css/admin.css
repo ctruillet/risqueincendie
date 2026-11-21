@@ -17,42 +17,6 @@ sgdf-card h2[slot="header"], sgdf-card h3[slot="header"] { margin: 0; font-size:
 .vide { color: var(--text-muted); text-align: center; list-style: none; }
 .hint-form { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
 
-/* Page de connexion : champs et bouton natifs au rendu de sgdf-input et sgdf-button,
-   affichés sans charger les composants */
-.champ { display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; font-weight: var(--sgdf-font-weight-semibold); }
-
-.champ input {
-    height: 2.5rem;
-    padding: 0 0.75rem;
-    border: 1px solid var(--sgdf-color-border);
-    border-radius: var(--sgdf-border-radius-medium);
-    background: var(--sgdf-color-bg-default);
-    color: var(--text-color);
-    font: inherit;
-    font-weight: normal;
-    font-size: 1rem;
-}
-
-.champ input:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 1px; }
-
-.bouton {
-    align-self: flex-start;
-    height: 2.5rem;
-    padding: 0 1rem;
-    border: none;
-    border-radius: var(--sgdf-border-radius-medium);
-    background: var(--sgdf-color-bg-primary);
-    color: var(--sgdf-color-on-default);
-    font: inherit;
-    font-weight: var(--sgdf-font-weight-bold);
-    cursor: pointer;
-}
-
-a.bouton { display: inline-flex; align-items: center; text-decoration: none; }
-.bouton:hover { background: var(--sgdf-color-bg-primary-hovered); }
-.bouton:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 2px; }
-.bouton:disabled { opacity: 0.6; cursor: wait; }
-
 .alerte {
     margin: 0;
     padding: 12px 14px;

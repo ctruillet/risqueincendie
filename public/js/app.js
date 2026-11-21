@@ -117,14 +117,11 @@ const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year:
 
 // Ouvre la fenêtre. Résout { date } ('' = fin de l'été), { retirer: true }, ou null si annulé.
 // mien : abonnement en cours (date préremplie, bouton « Me désabonner »)
-async function demanderAbonnement(camp, mien, { user, finSaison }) {
-    await import('/ui/admin.js');
-    await customElements.whenDefined('sgdf-dialog');
+function demanderAbonnement(camp, mien, { user, finSaison }) {
     const $ = id => document.getElementById(id);
     const dialog = $('abonnement');
     const date = $('abonnement-date');
-    dialog.title = camp.titre;
-    $('abonnement-texte').textContent = 'Chaque soir du camp, un mail avec les accès aux massifs du lendemain.';
+    $('abonnement-titre').textContent = camp.titre;
     $('abonnement-aide').textContent = user.email
         ? `Sans date : jusqu'à la fin de l'été (${dateLongue(finSaison)}).`
         : "Votre compte Intranet n'a pas d'e-mail : vous ne recevrez pas les mails.";
@@ -133,36 +130,23 @@ async function demanderAbonnement(camp, mien, { user, finSaison }) {
     date.max = finSaison;
     $('abonnement-ok').textContent = mien ? 'Enregistrer' : 'M\'abonner';
     $('abonnement-retirer').hidden = !mien;
-    dialog.open = true;
-    return new Promise(resolve => {
-        let reponse = null;
-        const boutons = {
-            'abonnement-ok': () => { reponse = { date: date.value || '' }; },
-            'abonnement-retirer': () => { reponse = { retirer: true }; },
-            'abonnement-annuler': () => {}
-        };
-        const clic = e => {
-            const id = Object.keys(boutons).find(i => e.target.closest(`#${i}`));
-            if (!id) return;
-            boutons[id]();
-            dialog.open = false;
-        };
-        dialog.addEventListener('click', clic);
-        // Le calendrier du champ date émet aussi sgdf-after-hide : seul celui de la fenêtre compte
-        const fin = e => {
-            if (e.target !== dialog) return;
-            dialog.removeEventListener('sgdf-after-hide', fin);
-            dialog.removeEventListener('click', clic);
-            resolve(reponse);
-        };
-        dialog.addEventListener('sgdf-after-hide', fin);
-    });
+    dialog.returnValue = '';
+    dialog.showModal();
+    // Le bouton cliqué donne la valeur de retour ; Échap la laisse vide
+    return new Promise(resolve => dialog.addEventListener('close', () => resolve(
+        dialog.returnValue === 'ok' ? { date: date.value }
+            : dialog.returnValue === 'retirer' ? { retirer: true } : null
+    ), { once: true }));
 }
 
+let minuteurNotification;
 function notifier(texte, erreur = false) {
-    document.getElementById('toast').create(texte, erreur
-        ? { variant: 'danger', title: 'Erreur', duration: 8000 }
-        : { variant: 'success', title: 'C\'est fait' });
+    const el = document.getElementById('notification');
+    el.textContent = texte;
+    el.classList.toggle('erreur', erreur);
+    el.hidden = false;
+    clearTimeout(minuteurNotification);
+    minuteurNotification = setTimeout(() => { el.hidden = true; }, erreur ? 8000 : 4000);
 }
 
 async function appelApi(chemin, method, body) {

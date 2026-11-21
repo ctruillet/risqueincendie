@@ -34,16 +34,26 @@
         </div>
     </main>
 
-    <!-- Abonnement à un camp (personne connectée) : composants sgdf chargés au premier clic -->
-    <sgdf-dialog id="abonnement">
-        <p id="abonnement-texte"></p>
-        <sgdf-date-time-picker id="abonnement-date" label="Jusqu'au (facultatif)"></sgdf-date-time-picker>
-        <p id="abonnement-aide" class="aide-dialog"></p>
-        <sgdf-button slot="footer" id="abonnement-retirer" variant="danger" appearance="text" hidden>Me désabonner</sgdf-button>
-        <sgdf-button slot="footer" id="abonnement-annuler" appearance="outlined">Annuler</sgdf-button>
-        <sgdf-button slot="footer" id="abonnement-ok" variant="primary">M'abonner</sgdf-button>
-    </sgdf-dialog>
-    <sgdf-toast id="toast"></sgdf-toast>
+    <!-- Abonnement à un camp (personne connectée) : fenêtre native, rien d'autre à charger -->
+    <dialog id="abonnement" class="fenetre" aria-labelledby="abonnement-titre">
+        <form method="dialog">
+            <div class="fenetre-entete">
+                <h2 id="abonnement-titre"></h2>
+                <button value="annuler" class="fenetre-fermer" aria-label="Fermer">×</button>
+            </div>
+            <p>Chaque soir du camp, un mail avec les accès aux massifs du lendemain.</p>
+            <label class="champ">Jusqu'au (facultatif)
+                <input type="date" id="abonnement-date">
+            </label>
+            <p id="abonnement-aide" class="aide-dialog"></p>
+            <div class="fenetre-actions">
+                <button value="retirer" id="abonnement-retirer" class="bouton bouton-texte" hidden>Me désabonner</button>
+                <button value="annuler" class="bouton bouton-secondaire">Annuler</button>
+                <button value="ok" id="abonnement-ok" class="bouton">M'abonner</button>
+            </div>
+        </form>
+    </dialog>
+    <p id="notification" class="notification" role="status" hidden></p>
 
     <!-- pied-de-page -->
 

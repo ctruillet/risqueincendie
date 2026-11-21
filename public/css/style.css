@@ -244,10 +244,88 @@ body {
 .lien-discret { padding: 0; border: none; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 .lien-discret:hover { color: var(--text-color); }
 
-/* Fenêtre d'abonnement : invisible tant que les composants sgdf ne sont pas chargés */
-sgdf-dialog:not(:defined), sgdf-toast:not(:defined) { display: none; }
-#abonnement p { margin: 0 0 12px; }
+/* ---------- Champs, boutons, fenêtre et notification natifs, au rendu SGDF ---------- */
+/* Champs et boutons natifs au rendu de sgdf-input et sgdf-button, sans charger les composants
+   (connexion, fenêtre d'abonnement de l'accueil) */
+.champ { display: flex; flex-direction: column; gap: 6px; font-size: 0.875rem; font-weight: var(--sgdf-font-weight-semibold); }
+
+.champ input {
+    height: 2.5rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--sgdf-color-border);
+    border-radius: var(--sgdf-border-radius-medium);
+    background: var(--sgdf-color-bg-default);
+    color: var(--text-color);
+    font: inherit;
+    font-weight: normal;
+    font-size: 1rem;
+}
+
+.champ input:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 1px; }
+
+.bouton {
+    align-self: flex-start;
+    height: 2.5rem;
+    padding: 0 1rem;
+    border: none;
+    border-radius: var(--sgdf-border-radius-medium);
+    background: var(--sgdf-color-bg-primary);
+    color: var(--sgdf-color-on-default);
+    font: inherit;
+    font-weight: var(--sgdf-font-weight-bold);
+    cursor: pointer;
+}
+
+a.bouton { display: inline-flex; align-items: center; text-decoration: none; }
+.bouton:hover { background: var(--sgdf-color-bg-primary-hovered); }
+.bouton:focus-visible { outline: var(--sgdf-focus-ring); outline-offset: 2px; }
+.bouton:disabled { opacity: 0.6; cursor: wait; }
+
+
+.bouton-secondaire { background: none; border: 1px solid var(--sgdf-color-border); color: var(--text-color); }
+.bouton-secondaire:hover { background: var(--sgdf-color-bg-default-hovered, rgba(0, 0, 0, 0.04)); }
+.bouton-texte { padding: 0 0.5rem; background: none; color: var(--sgdf-link-color, var(--sgdf-color-scout-guide-500)); }
+.bouton-texte:hover { background: none; text-decoration: underline; }
+
+/* Fenêtre d'abonnement (élément <dialog> natif) */
+.fenetre {
+    width: min(28rem, calc(100% - 32px));
+    padding: 20px;
+    border: none;
+    border-radius: var(--sgdf-border-radius-large);
+    background: var(--sgdf-color-bg-default);
+    color: var(--text-color);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+.fenetre::backdrop { background: rgba(0, 20, 40, 0.5); }
+.fenetre form { display: flex; flex-direction: column; gap: 14px; }
+.fenetre-entete { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.fenetre-entete h2 { margin: 0; font-size: 1.1rem; line-height: 1.3; color: var(--sgdf-color-text-heading); }
+.fenetre-fermer { padding: 0 4px; border: none; background: none; color: var(--text-muted); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.fenetre p { margin: 0; }
+.fenetre-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.fenetre-actions .bouton { align-self: auto; }
+#abonnement-retirer { margin-right: auto; }
 .aide-dialog { font-size: 0.85rem; color: var(--text-muted); }
+
+/* Notification après une action (en haut de l'écran, quelques secondes) */
+.notification {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    z-index: 10;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 32px);
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--sgdf-color-success-alert-border);
+    border-radius: var(--sgdf-border-radius-medium);
+    background: var(--sgdf-color-success-alert-bg);
+    color: var(--text-color);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+.notification.erreur { border-color: var(--sgdf-color-danger-alert-border); background: var(--sgdf-color-danger-alert-bg); }
 .lien-action svg { width: 1em; height: 1em; flex-shrink: 0; }
 
 /* Onglets (rendu sgdf-tab-group) */
