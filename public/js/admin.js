@@ -79,7 +79,7 @@ function confirmer({ titre, texte, bouton = 'Confirmer', variante = 'danger' }) 
 const valeur = (racine, nom) => String(racine.querySelector(`[name=${nom}]`)?.value ?? '').trim();
 const dateLongue = iso => formatDate(iso, { day: 'numeric', month: 'long', year: 'numeric' });
 // Nom affiché d'un membre : son nom (connu après sa première connexion), sinon ce qu'a saisi l'admin
-const nomMembre = m => m.nom || m.email || `N° ${m.identifiant}`;
+const nomMembre = m => m.nom || m.email || (m.identifiant ? `N° ${m.identifiant}` : 'pas encore connecté');
 
 $('#btn-logout').addEventListener('click', async () => {
     await api('logout', { method: 'POST', body: {} }).catch(() => {});
