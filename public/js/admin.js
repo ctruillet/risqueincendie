@@ -4,7 +4,7 @@
 // Les composants sgdf-* viennent du design system SGDF (ui/admin.js, chargé après la connexion).
 const $ = sel => document.querySelector(sel);
 
-let massifs = {};
+let massifs = null;         // massifs.json, chargé à la première ouverture du formulaire
 let camps = [];
 let finSaison = '';        // fin de l'été : fin des abonnements
 let utilisateur = null;
@@ -347,7 +347,9 @@ $('#membre-qui').addEventListener('keydown', e => {
 
 // --- Création et modification d'un camp ---
 
-function ouvrirEdition(camp = null) {
+async function ouvrirEdition(camp = null) {
+    massifs ??= await fetchJson('massifs.json').catch(e => { notifier(e.message, { erreur: true }); return null; });
+    if (!massifs) return;
     campEdite = camp;
     const form = $('#form-camp');
     erreurForm();
@@ -449,7 +451,7 @@ async function demarrer() {
     if (!user) return location.replace('connexion?retour=/admin');
     utilisateur = user;
     $('#user-nom').textContent = user.nom || user.identifiant;
-    await import('/ui/admin.js');
+    await import(document.querySelector('link[rel=modulepreload]').href);
     await customElements.whenDefined('sgdf-select');
     if (user.superAdmin) {
         $('#titre-admin').textContent = 'Tous les camps';
@@ -457,7 +459,6 @@ async function demarrer() {
         $('#btn-nouveau').hidden = false;
     }
     $('#onglet-envois').hidden = !user.admin;
-    massifs = await fetchJson('massifs.json');
     await Promise.all([chargerCamps(), chargerStatus()]);
     $('#vue-app').hidden = false;
 }
